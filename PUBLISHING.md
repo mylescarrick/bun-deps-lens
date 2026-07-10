@@ -2,58 +2,90 @@
 
 Releases are published to the VS Code Marketplace automatically by
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) when a `v*` tag is
-pushed. Authentication uses **Microsoft Entra ID via GitHub OIDC** — no
-Personal Access Token is ever created or stored (global Azure DevOps PATs
-retire on 2026-12-01).
+pushed. Authentication uses **Microsoft Entra ID via GitHub OIDC** — after the
+one-time bootstrap below, no long-lived secret is stored anywhere (global Azure
+DevOps PATs retire on 2026-12-01).
+
+## How the auth works (the mental model)
+
+The Marketplace is backed by Azure DevOps. To publish without a stored password:
+
+- An **Entra app registration** (a "service principal") is the identity that
+  publishes.
+- A **federated credential** on that app is a trust rule: it lets GitHub
+  Actions log in **with no secret**, as long as the request provably comes from
+  a specific repo + context. At run time GitHub mints a short-lived signed OIDC
+  token describing the job; Azure checks its issuer + *subject* against the rule
+  and, if they match, returns a ~1-hour access token. A different repo/branch
+  produces a different subject and is rejected.
+- The subject we trust is `repo:mylescarrick/bun-deps-lens:environment:release`,
+  which is why the `publish` job runs in a GitHub environment named `release`.
 
 ## One-time setup
 
-You need an [Azure](https://portal.azure.com) account and a Marketplace
-publisher. None of this stores a long-lived secret.
+### 1. Marketplace publisher — DONE
 
-### 1. Marketplace publisher
+Publisher **`myles-carrick`** at <https://marketplace.visualstudio.com/manage>.
+Must match the `publisher` field in `package.json`.
 
-Create the publisher **`myles-carrick`** at
-<https://marketplace.visualstudio.com/manage> (skip if it already exists).
-It must match the `publisher` field in `package.json`.
+### 2. Entra ID app registration — DONE
 
-### 2. Entra ID app registration
+App **`vscode-bun-deps-lens`** (multitenant is fine). From its **Overview**:
 
-In the [Azure Portal](https://portal.azure.com) → **Microsoft Entra ID** →
-**App registrations** → **New registration** (single tenant is fine).
+- **Application (client) ID** `a5e55024-131e-41e8-9a98-f5d1f3ffa48f` → GitHub
+  secret `AZURE_CLIENT_ID`
+- **Directory (tenant) ID** `f5296a02-bc33-46a1-91e1-c52eda52c829` → GitHub
+  secret `AZURE_TENANT_ID`
 
-Record from the app's **Overview**:
+> The **Object ID** on the Overview blade is the app-registration object and is
+> *not* used anywhere here — don't confuse it with the client ID.
 
-- **Application (client) ID** → GitHub secret `AZURE_CLIENT_ID`
-- **Directory (tenant) ID** → GitHub secret `AZURE_TENANT_ID`
+### 3. Federated credential — DONE
 
-### 3. Federated credential (the GitHub ⇄ Azure trust)
+App → **Certificates & secrets → Federated credentials → Add credential** →
+scenario **GitHub Actions deploying Azure resources**:
 
-On the app → **Certificates & secrets** → **Federated credentials** →
-**Add credential** → scenario **GitHub Actions deploying Azure resources**:
+- Organization `mylescarrick`, Repository `bun-deps-lens`
+- Entity type **Environment**, name **`release`**
 
-- Organization: `mylescarrick`
-- Repository: `bun-deps-lens`
-- Entity type: **Environment**, name: **`release`**
+### 4. Materialise the service principal and add it to the publisher
 
-This produces the subject
-`repo:mylescarrick/bun-deps-lens:environment:release`, which is exactly what
-the workflow's `publish` job (with `environment: release`) presents.
+The publisher's member list takes the SP's **Azure DevOps profile identity**,
+not the client ID — and that identity only exists after the SP has signed in to
+Azure DevOps once. To bootstrap it you need a real credential temporarily:
 
-### 4. Authorise the app on the publisher
+1. App → **Certificates & secrets → New client secret**; copy the value.
+2. Sign in as the SP and hit the profile API (this materialises it). The SP has
+   no Azure subscription, so `--allow-no-subscriptions` is expected:
 
-Add the app registration's **service principal** as a member of the
-`myles-carrick` publisher (Marketplace **Manage** page → publisher members)
-with a publishing role (**Contributor**). This is what actually grants the
-identity permission to publish.
+   ```sh
+   az login --service-principal \
+     -u a5e55024-131e-41e8-9a98-f5d1f3ffa48f \
+     -p '<CLIENT_SECRET>' \
+     --tenant f5296a02-bc33-46a1-91e1-c52eda52c829 \
+     --allow-no-subscriptions
 
-### 5. GitHub configuration
+   # 499b84ac-... is the fixed Azure DevOps resource ID
+   az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me \
+     --resource 499b84ac-1321-427f-aa17-267ca6975798
+   ```
 
-- Repo → **Settings → Environments** → create an environment named
-  **`release`** (optionally add required reviewers to gate publishes).
+   Note the returned profile `id`
+   (`c7368f0f-f5ef-6573-a0e1-de14200d74d7`). — DONE
+3. At <https://marketplace.visualstudio.com/manage/publishers/myles-carrick> →
+   **Members → Add**, add the SP (search its display name
+   `vscode-bun-deps-lens`; the profile id above is the fallback identifier) with
+   a role that can publish. — TODO
+4. **Delete the temporary client secret** — CI uses the federated credential, so
+   nothing stored. — TODO
+
+### 5. GitHub configuration — TODO
+
+- Repo → **Settings → Environments** → create **`release`** (optionally add
+  required reviewers to gate publishes).
 - Repo → **Settings → Secrets and variables → Actions** → add:
-  - `AZURE_CLIENT_ID`
-  - `AZURE_TENANT_ID`
+  - `AZURE_CLIENT_ID` = `a5e55024-131e-41e8-9a98-f5d1f3ffa48f`
+  - `AZURE_TENANT_ID` = `f5296a02-bc33-46a1-91e1-c52eda52c829`
 
 ## Cutting a release
 
@@ -70,7 +102,7 @@ and PR; `publish` runs only on `v*` tags after `verify` passes.
 ## Publishing manually (fallback)
 
 ```sh
-az login                       # sign in with an account authorised on the publisher
+az login                       # an account authorised on the publisher
 bun install
 ./node_modules/.bin/vsce publish --azure-credential --no-dependencies
 ```

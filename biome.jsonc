@@ -1,0 +1,19 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/biome/core"],
+  "linter": {
+    "rules": {
+      "performance": {
+        // The `vscode` module only supports namespace/named imports and is
+        // marked external in our bundle, so tree-shaking concerns don't apply.
+        "noNamespaceImport": "off"
+      },
+      "suspicious": {
+        // Biome's type inference treats RegExp.exec() and Record index access
+        // as non-nullable, conflicting with tsconfig's noUncheckedIndexedAccess
+        // and producing false positives on genuinely-nullable values.
+        "noUnnecessaryConditions": "off"
+      }
+    }
+  }
+}

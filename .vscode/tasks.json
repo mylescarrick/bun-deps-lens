@@ -1,0 +1,20 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "build:dev",
+      "problemMatcher": [],
+      "label": "npm: build:dev",
+      "detail": "Bundle the extension for debugging"
+    },
+    {
+      "type": "npm",
+      "script": "watch",
+      "isBackground": true,
+      "problemMatcher": [],
+      "label": "npm: watch",
+      "detail": "Rebuild the extension on change"
+    }
+  ]
+}

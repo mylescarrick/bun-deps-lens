@@ -1,0 +1,106 @@
+{
+  "devDependencies": {
+    "@biomejs/biome": "2.5.2",
+    "@types/bun": "latest",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.9.0",
+    "ultracite": "7.9.3"
+  },
+  "name": "bun-deps-lens",
+  "scripts": {
+    "build": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --minify --sourcemap=linked",
+    "build:dev": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked",
+    "watch": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "ultracite check",
+    "format": "ultracite fix",
+    "test": "bun test",
+    "package": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies",
+    "vscode:prepublish": "bun run build"
+  },
+  "version": "0.1.0",
+  "displayName": "Bun Deps Lens",
+  "description": "Inline colour-coded dependency status for package.json, powered by Bun's outdated & audit CLIs.",
+  "publisher": "myles-carrick",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mylescarrick/bun-deps-lens.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mylescarrick/bun-deps-lens/issues"
+  },
+  "homepage": "https://github.com/mylescarrick/bun-deps-lens#readme",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Linters",
+    "Visualization"
+  ],
+  "keywords": [
+    "bun",
+    "dependencies",
+    "package.json",
+    "outdated",
+    "audit"
+  ],
+  "pricing": "Free",
+  "galleryBanner": {
+    "color": "#14151A",
+    "theme": "dark"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/bun.lock",
+    "workspaceContains:**/bun.lockb",
+    "workspaceContains:**/bunfig.toml"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "bunDepsLens.refresh",
+        "title": "Bun Deps Lens: Refresh"
+      }
+    ],
+    "configuration": {
+      "title": "Bun Deps Lens",
+      "properties": {
+        "bunDepsLens.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Master toggle for Bun Deps Lens annotations."
+        },
+        "bunDepsLens.refreshIntervalMinutes": {
+          "type": "number",
+          "default": 15,
+          "minimum": 0,
+          "description": "Background re-check cadence in minutes while a package.json is open. Set to 0 to disable background refresh."
+        },
+        "bunDepsLens.severityThreshold": {
+          "type": "string",
+          "default": "high",
+          "enum": [
+            "low",
+            "moderate",
+            "high",
+            "critical"
+          ],
+          "description": "Minimum audit severity that colours a dependency red."
+        },
+        "bunDepsLens.showInlineVersions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the faint 'current → latest' text after outdated dependencies."
+        },
+        "bunDepsLens.respectMinimumReleaseAge": {
+          "type": "boolean",
+          "default": true,
+          "description": "Honour bunfig.toml [install].minimumReleaseAge when deciding what counts as installable (v1.1)."
+        }
+      }
+    }
+  }
+}

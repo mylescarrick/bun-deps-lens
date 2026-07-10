@@ -47,6 +47,7 @@
     "outdated",
     "audit"
   ],
+  "icon": "media/icon.png",
   "pricing": "Free",
   "galleryBanner": {
     "color": "#14151A",

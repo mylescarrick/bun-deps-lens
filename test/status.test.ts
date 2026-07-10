@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseAudit } from "../src/bun/audit";
-import { buildStatuses } from "../src/status";
+import { buildStatuses, inlineLabel } from "../src/status";
 import type { OutdatedEntry } from "../src/types";
 
 const outdated: OutdatedEntry[] = [
@@ -64,5 +64,36 @@ describe("buildStatuses", () => {
     expect(tooltip).toContain("4.17.20");
     expect(tooltip).toContain("4.18.1");
     expect(tooltip).toContain("Command Injection");
+    expect(tooltip).toContain("Bun Deps Lens");
+  });
+});
+
+describe("inlineLabel", () => {
+  const statuses = buildStatuses(
+    ["lodash", "react", "typescript"],
+    outdated,
+    audit,
+    "high"
+  );
+  const labelFor = (name: string): string | undefined => {
+    const status = statuses.get(name);
+    if (status === undefined) {
+      throw new Error(`no status for ${name}`);
+    }
+    return inlineLabel(status);
+  };
+
+  test("red shows severity and version transition", () => {
+    const label = labelFor("lodash") ?? "";
+    expect(label).toContain("high vuln");
+    expect(label).toContain("4.17.20 → 4.18.1");
+  });
+
+  test("amber shows the version transition", () => {
+    expect(labelFor("react")).toBe("● 18.3.1 → 19.2.7");
+  });
+
+  test("green is silent", () => {
+    expect(labelFor("typescript")).toBeUndefined();
   });
 });

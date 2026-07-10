@@ -1,6 +1,16 @@
 # Changelog
 
-## [0.1.0] - Unreleased
+## [0.1.1] - Unreleased
+
+- Colour the dependency version text itself (theme-aware green/amber/red)
+  instead of a faint background, so status is legible at a glance.
+- Always show an inline status message on outdated/vulnerable dependencies
+  (`● current → latest`, or `● <severity> vuln · current → latest`); green
+  stays silent.
+- Brand the hover with a "Bun Deps Lens" heading so it's distinguishable from
+  VS Code's built-in package.json hover.
+
+## [0.1.0]
 
 Initial release (v1 MVP).
 

@@ -20,7 +20,7 @@
     "publish": "vsce publish --no-dependencies",
     "vscode:prepublish": "bun run build"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "Bun Deps Lens",
   "description": "Inline colour-coded dependency status for package.json, powered by Bun's outdated & audit CLIs.",
   "publisher": "myles-carrick",
@@ -94,7 +94,7 @@
         "bunDepsLens.showInlineVersions": {
           "type": "boolean",
           "default": true,
-          "description": "Show the faint 'current → latest' text after outdated dependencies."
+          "description": "Show the inline status message (e.g. 'current → latest' or a vulnerability note) after outdated or vulnerable dependencies."
         },
         "bunDepsLens.respectMinimumReleaseAge": {
           "type": "boolean",

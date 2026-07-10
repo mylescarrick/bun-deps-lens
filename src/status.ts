@@ -63,13 +63,32 @@ function computeStatus(
   };
 }
 
+// Short label rendered inline after the dependency line. Green is intentionally
+// silent — the coloured value text already says "nothing to do here".
+export function inlineLabel(status: DepStatus): string | undefined {
+  const transition =
+    status.current && status.latest
+      ? `${status.current} → ${status.latest}`
+      : undefined;
+
+  if (status.color === "red") {
+    const severity = status.maxSeverity ?? "known";
+    return transition
+      ? `● ${severity} vuln · ${transition}`
+      : `● ${severity} vuln`;
+  }
+  if (status.color === "amber") {
+    return transition ? `● ${transition}` : "● update available";
+  }
+}
+
 function buildTooltip(
   name: string,
   entry: OutdatedEntry | undefined,
   advisories: Advisory[],
   highest: Severity | undefined
 ): string {
-  const lines: string[] = [`**${name}**`];
+  const lines: string[] = ["$(package) **Bun Deps Lens**", "", `**${name}**`];
 
   if (entry && entry.current !== entry.latest) {
     lines.push(`Current \`${entry.current}\` → latest \`${entry.latest}\``);

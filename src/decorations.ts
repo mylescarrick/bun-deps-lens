@@ -1,32 +1,23 @@
 import * as vscode from "vscode";
+import { inlineLabel } from "./status";
 import type { DepLocation, DepStatus, StatusColor } from "./types";
 
-const BACKGROUNDS: Record<StatusColor, string> = {
-  amber: "rgba(210, 153, 34, 0.16)",
-  green: "rgba(63, 185, 80, 0.14)",
-  red: "rgba(248, 81, 73, 0.18)",
+// Theme-aware chart colours adapt across light/dark/high-contrast themes.
+const THEME_COLOR: Record<StatusColor, string> = {
+  amber: "charts.orange",
+  green: "charts.green",
+  red: "charts.red",
 };
 
 export class DepDecorator implements vscode.Disposable {
-  private readonly backgrounds: Record<
-    StatusColor,
-    vscode.TextEditorDecorationType
-  >;
-  private readonly inline: vscode.TextEditorDecorationType;
+  private readonly types: Record<StatusColor, vscode.TextEditorDecorationType>;
 
   constructor() {
-    this.backgrounds = {
-      amber: makeBackground(BACKGROUNDS.amber),
-      green: makeBackground(BACKGROUNDS.green),
-      red: makeBackground(BACKGROUNDS.red),
+    this.types = {
+      amber: makeType("amber"),
+      green: makeType("green"),
+      red: makeType("red"),
     };
-    this.inline = vscode.window.createTextEditorDecorationType({
-      after: {
-        color: new vscode.ThemeColor("editorCodeLens.foreground"),
-        fontStyle: "italic",
-        margin: "0 0 0 1rem",
-      },
-    });
   }
 
   render(
@@ -40,7 +31,6 @@ export class DepDecorator implements vscode.Disposable {
       green: [],
       red: [],
     };
-    const inlineOptions: vscode.DecorationOptions[] = [];
 
     for (const location of locations) {
       const status = statuses.get(location.name);
@@ -54,55 +44,50 @@ export class DepDecorator implements vscode.Disposable {
         location.valueEndLine,
         location.valueEndCol
       );
-      const hover = new vscode.MarkdownString(status.tooltip);
-      hover.isTrusted = false;
-      buckets[status.color].push({ hoverMessage: hover, range: valueRange });
 
-      if (
-        showInlineVersions &&
-        status.outdated &&
-        status.current &&
-        status.latest
-      ) {
-        inlineOptions.push({
-          range: new vscode.Range(
-            location.valueEndLine,
-            location.valueEndCol,
-            location.valueEndLine,
-            location.valueEndCol
-          ),
-          renderOptions: {
-            after: { contentText: `${status.current} → ${status.latest}` },
+      const hover = new vscode.MarkdownString(status.tooltip);
+      hover.supportThemeIcons = true;
+
+      const option: vscode.DecorationOptions = {
+        hoverMessage: hover,
+        range: valueRange,
+      };
+
+      const label = showInlineVersions ? inlineLabel(status) : undefined;
+      if (label !== undefined) {
+        option.renderOptions = {
+          after: {
+            color: new vscode.ThemeColor(THEME_COLOR[status.color]),
+            contentText: `  ${label}`,
+            fontStyle: "italic",
           },
-        });
+        };
       }
+
+      buckets[status.color].push(option);
     }
 
-    editor.setDecorations(this.backgrounds.green, buckets.green);
-    editor.setDecorations(this.backgrounds.amber, buckets.amber);
-    editor.setDecorations(this.backgrounds.red, buckets.red);
-    editor.setDecorations(this.inline, inlineOptions);
+    editor.setDecorations(this.types.green, buckets.green);
+    editor.setDecorations(this.types.amber, buckets.amber);
+    editor.setDecorations(this.types.red, buckets.red);
   }
 
   clear(editor: vscode.TextEditor): void {
-    editor.setDecorations(this.backgrounds.green, []);
-    editor.setDecorations(this.backgrounds.amber, []);
-    editor.setDecorations(this.backgrounds.red, []);
-    editor.setDecorations(this.inline, []);
+    editor.setDecorations(this.types.green, []);
+    editor.setDecorations(this.types.amber, []);
+    editor.setDecorations(this.types.red, []);
   }
 
   dispose(): void {
-    this.backgrounds.green.dispose();
-    this.backgrounds.amber.dispose();
-    this.backgrounds.red.dispose();
-    this.inline.dispose();
+    this.types.green.dispose();
+    this.types.amber.dispose();
+    this.types.red.dispose();
   }
 }
 
-function makeBackground(color: string): vscode.TextEditorDecorationType {
+function makeType(color: StatusColor): vscode.TextEditorDecorationType {
   return vscode.window.createTextEditorDecorationType({
-    backgroundColor: color,
-    borderRadius: "3px",
-    rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+    color: new vscode.ThemeColor(THEME_COLOR[color]),
+    fontWeight: color === "red" ? "bold" : "normal",
   });
 }

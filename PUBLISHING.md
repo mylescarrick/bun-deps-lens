@@ -73,9 +73,10 @@ Azure DevOps once. To bootstrap it you need a real credential temporarily:
    Note the returned profile `id`
    (`c7368f0f-f5ef-6573-a0e1-de14200d74d7`). — DONE
 3. At <https://marketplace.visualstudio.com/manage/publishers/myles-carrick> →
-   **Members → Add**, add the SP (search its display name
-   `vscode-bun-deps-lens`; the profile id above is the fallback identifier) with
-   a role that can publish. — TODO
+   **Members → Add**, add the SP using the profile **`id` UUID** from the JSON
+   above — `c7368f0f-f5ef-6573-a0e1-de14200d74d7` — not the display name (the
+   name search does not resolve the SP). Give it a role that can publish.
+   — DONE
 4. **Delete the temporary client secret** — CI uses the federated credential, so
    nothing stored. — TODO
 

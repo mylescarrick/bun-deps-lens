@@ -88,7 +88,7 @@ function buildTooltip(
   advisories: Advisory[],
   highest: Severity | undefined
 ): string {
-  const lines: string[] = ["$(package) **Bun Deps Lens**", "", `**${name}**`];
+  const lines: string[] = ["$(package) **Bun Deps**", "", `**${name}**`];
 
   if (entry && entry.current !== entry.latest) {
     lines.push(`Current \`${entry.current}\` → latest \`${entry.latest}\``);

@@ -7,7 +7,7 @@
     "typescript": "^5.9.0",
     "ultracite": "7.9.3"
   },
-  "name": "bun-deps-lens",
+  "name": "bun-deps",
   "scripts": {
     "build": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --minify --sourcemap=linked",
     "build:dev": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked",
@@ -21,7 +21,7 @@
     "vscode:prepublish": "bun run build"
   },
   "version": "0.1.1",
-  "displayName": "Bun Deps Lens",
+  "displayName": "Bun Deps",
   "description": "Inline colour-coded dependency status for package.json, powered by Bun's outdated & audit CLIs.",
   "publisher": "myles-carrick",
   "license": "MIT",
@@ -62,25 +62,25 @@
   "contributes": {
     "commands": [
       {
-        "command": "bunDepsLens.refresh",
-        "title": "Bun Deps Lens: Refresh"
+        "command": "bunDeps.refresh",
+        "title": "Bun Deps: Refresh"
       }
     ],
     "configuration": {
-      "title": "Bun Deps Lens",
+      "title": "Bun Deps",
       "properties": {
-        "bunDepsLens.enable": {
+        "bunDeps.enable": {
           "type": "boolean",
           "default": true,
-          "description": "Master toggle for Bun Deps Lens annotations."
+          "description": "Master toggle for Bun Deps annotations."
         },
-        "bunDepsLens.refreshIntervalMinutes": {
+        "bunDeps.refreshIntervalMinutes": {
           "type": "number",
           "default": 15,
           "minimum": 0,
           "description": "Background re-check cadence in minutes while a package.json is open. Set to 0 to disable background refresh."
         },
-        "bunDepsLens.severityThreshold": {
+        "bunDeps.severityThreshold": {
           "type": "string",
           "default": "high",
           "enum": [
@@ -91,12 +91,12 @@
           ],
           "description": "Minimum audit severity that colours a dependency red."
         },
-        "bunDepsLens.showInlineVersions": {
+        "bunDeps.showInlineVersions": {
           "type": "boolean",
           "default": true,
           "description": "Show the inline status message (e.g. 'current → latest' or a vulnerability note) after outdated or vulnerable dependencies."
         },
-        "bunDepsLens.respectMinimumReleaseAge": {
+        "bunDeps.respectMinimumReleaseAge": {
           "type": "boolean",
           "default": true,
           "description": "Honour bunfig.toml [install].minimumReleaseAge when deciding what counts as installable (v1.1)."

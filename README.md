@@ -1,4 +1,4 @@
-# Bun Deps Lens
+# Bun Deps
 
 A Bun-only VS Code extension that annotates `package.json` with inline,
 colour-coded dependency status, powered entirely by the `bun` CLI already on
@@ -23,13 +23,13 @@ details.
 
 | Setting | Default | Purpose |
 |---|---|---|
-| `bunDepsLens.enable` | `true` | Master toggle |
-| `bunDepsLens.refreshIntervalMinutes` | `15` | Background re-check cadence (0 disables) |
-| `bunDepsLens.severityThreshold` | `"high"` | Minimum audit severity that colours a dep red |
-| `bunDepsLens.showInlineVersions` | `true` | Toggle the faint `current → latest` text |
-| `bunDepsLens.respectMinimumReleaseAge` | `true` | Reserved for `minimumReleaseAge` support (v1.1) |
+| `bunDeps.enable` | `true` | Master toggle |
+| `bunDeps.refreshIntervalMinutes` | `15` | Background re-check cadence (0 disables) |
+| `bunDeps.severityThreshold` | `"high"` | Minimum audit severity that colours a dep red |
+| `bunDeps.showInlineVersions` | `true` | Toggle the inline status message after outdated/vulnerable deps |
+| `bunDeps.respectMinimumReleaseAge` | `true` | Reserved for `minimumReleaseAge` support (v1.1) |
 
-Run **Bun Deps Lens: Refresh** from the command palette to re-analyse on demand.
+Run **Bun Deps: Refresh** from the command palette to re-analyse on demand.
 
 ## Development
 

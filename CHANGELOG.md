@@ -2,12 +2,15 @@
 
 ## [0.1.1] - Unreleased
 
+- Renamed the extension from **Bun Deps Lens** (`myles-carrick.bun-deps-lens`)
+  to **Bun Deps** (`myles-carrick.bun-deps`). Settings and the command moved
+  from the `bunDepsLens.*` namespace to `bunDeps.*`.
 - Colour the dependency version text itself (theme-aware green/amber/red)
   instead of a faint background, so status is legible at a glance.
 - Always show an inline status message on outdated/vulnerable dependencies
   (`● current → latest`, or `● <severity> vuln · current → latest`); green
   stays silent.
-- Brand the hover with a "Bun Deps Lens" heading so it's distinguishable from
+- Brand the hover with a "Bun Deps" heading so it's distinguishable from
   VS Code's built-in package.json hover.
 
 ## [0.1.0]
@@ -21,4 +24,4 @@ Initial release (v1 MVP).
 - Powered entirely by the local `bun` CLI (`bun outdated` + `bun audit --json`).
 - Activates only in Bun projects (`bun.lock`, `bun.lockb`, or `bunfig.toml`).
 - Settings for enable, refresh cadence, severity threshold, and inline text.
-- **Bun Deps Lens: Refresh** command.
+- **Bun Deps: Refresh** command.

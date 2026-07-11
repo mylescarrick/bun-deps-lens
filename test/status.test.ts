@@ -64,7 +64,7 @@ describe("buildStatuses", () => {
     expect(tooltip).toContain("4.17.20");
     expect(tooltip).toContain("4.18.1");
     expect(tooltip).toContain("Command Injection");
-    expect(tooltip).toContain("Bun Deps Lens");
+    expect(tooltip).toContain("Bun Deps");
   });
 });
 

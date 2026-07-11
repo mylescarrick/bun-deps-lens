@@ -21,11 +21,11 @@ let bunUnavailableWarned = false;
 
 export function activate(context: vscode.ExtensionContext): void {
   decorator = new DepDecorator();
-  output = vscode.window.createOutputChannel("Bun Deps Lens");
+  output = vscode.window.createOutputChannel("Bun Deps");
   context.subscriptions.push(decorator, output);
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("bunDepsLens.refresh", () => {
+    vscode.commands.registerCommand("bunDeps.refresh", () => {
       const editor = vscode.window.activeTextEditor;
       if (editor && isPackageJson(editor.document)) {
         refresh(editor).catch(reportError);
@@ -40,7 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
       forEachEditor(doc, (editor) => scheduleRefresh(editor));
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("bunDepsLens")) {
+      if (event.affectsConfiguration("bunDeps")) {
         refreshAllVisible();
       }
     })
@@ -61,7 +61,7 @@ export function deactivate(): void {
 }
 
 function config(): vscode.WorkspaceConfiguration {
-  return vscode.workspace.getConfiguration("bunDepsLens");
+  return vscode.workspace.getConfiguration("bunDeps");
 }
 
 function isPackageJson(doc: vscode.TextDocument): boolean {
@@ -173,7 +173,7 @@ function warnBunUnavailable(message: string): void {
   if (!bunUnavailableWarned) {
     bunUnavailableWarned = true;
     vscode.window.showWarningMessage(
-      `Bun Deps Lens: ${message} Install Bun or set it on PATH to enable annotations.`
+      `Bun Deps: ${message} Install Bun or set it on PATH to enable annotations.`
     );
   }
 }
@@ -193,7 +193,7 @@ function setupBackgroundRefresh(context: vscode.ExtensionContext): void {
   schedule();
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("bunDepsLens.refreshIntervalMinutes")) {
+      if (event.affectsConfiguration("bunDeps.refreshIntervalMinutes")) {
         schedule();
       }
     }),

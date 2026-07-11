@@ -1,10 +1,11 @@
 # Changelog
 
-## [0.1.3]
+## [0.1.4]
 
-- Documentation only: refresh the README (and Marketplace listing) for the
-  coloured version text, live re-render, pending-install hint, and install
-  instructions.
+- Fix a stale `bun.lock` (pinned `@biomejs/biome` version) that broke the
+  frozen-lockfile install in CI. (0.1.3 was never published.)
+- Documentation: refresh the README (and Marketplace listing) for the coloured
+  version text, live re-render, pending-install hint, and install instructions.
 
 ## [0.1.2]
 

@@ -1,6 +1,15 @@
 # Changelog
 
-## [0.1.1] - Unreleased
+## [0.1.2] - Unreleased
+
+- Re-render annotations live as you edit `package.json` (no save required),
+  instead of only on save.
+- Detect a pending install: when an edited version range isn't satisfied by
+  what's in `node_modules`, show "Run `bun i` to apply your change." The hint
+  clears automatically once the lockfile updates after install.
+- Watch `bun.lock` so annotations refresh after `bun i` completes.
+
+## [0.1.1]
 
 - Renamed the extension from **Bun Deps Lens** (`myles-carrick.bun-deps-lens`)
   to **Bun Deps** (`myles-carrick.bun-deps`). Settings and the command moved

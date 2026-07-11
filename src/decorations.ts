@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
-import { inlineLabel } from "./status";
+import type { Pending } from "./installed";
+import { inlineLabel, PENDING_INLINE, pendingTooltip } from "./status";
 import type { DepLocation, DepStatus, StatusColor } from "./types";
 
 // Theme-aware chart colours adapt across light/dark/high-contrast themes.
@@ -24,7 +25,8 @@ export class DepDecorator implements vscode.Disposable {
     editor: vscode.TextEditor,
     locations: DepLocation[],
     statuses: Map<string, DepStatus>,
-    showInlineVersions: boolean
+    showInlineVersions: boolean,
+    pending: Map<string, Pending>
   ): void {
     const buckets: Record<StatusColor, vscode.DecorationOptions[]> = {
       amber: [],
@@ -33,11 +35,6 @@ export class DepDecorator implements vscode.Disposable {
     };
 
     for (const location of locations) {
-      const status = statuses.get(location.name);
-      if (status === undefined) {
-        continue;
-      }
-
       const valueRange = new vscode.Range(
         location.valueStartLine,
         location.valueStartCol,
@@ -45,26 +42,36 @@ export class DepDecorator implements vscode.Disposable {
         location.valueEndCol
       );
 
-      const hover = new vscode.MarkdownString(status.tooltip);
-      hover.supportThemeIcons = true;
-
-      const option: vscode.DecorationOptions = {
-        hoverMessage: hover,
-        range: valueRange,
-      };
-
-      const label = showInlineVersions ? inlineLabel(status) : undefined;
-      if (label !== undefined) {
-        option.renderOptions = {
-          after: {
-            color: new vscode.ThemeColor(THEME_COLOR[status.color]),
-            contentText: `  ${label}`,
-            fontStyle: "italic",
-          },
-        };
+      const pendingEntry = pending.get(location.name);
+      if (pendingEntry !== undefined) {
+        buckets.amber.push(
+          decoration(
+            valueRange,
+            pendingTooltip(
+              location.name,
+              pendingEntry.declared,
+              pendingEntry.installed
+            ),
+            showInlineVersions ? PENDING_INLINE : undefined,
+            "amber"
+          )
+        );
+        continue;
       }
 
-      buckets[status.color].push(option);
+      const status = statuses.get(location.name);
+      if (status === undefined) {
+        continue;
+      }
+
+      buckets[status.color].push(
+        decoration(
+          valueRange,
+          status.tooltip,
+          showInlineVersions ? inlineLabel(status) : undefined,
+          status.color
+        )
+      );
     }
 
     editor.setDecorations(this.types.green, buckets.green);
@@ -83,6 +90,28 @@ export class DepDecorator implements vscode.Disposable {
     this.types.amber.dispose();
     this.types.red.dispose();
   }
+}
+
+function decoration(
+  range: vscode.Range,
+  tooltip: string,
+  inline: string | undefined,
+  color: StatusColor
+): vscode.DecorationOptions {
+  const hover = new vscode.MarkdownString(tooltip);
+  hover.supportThemeIcons = true;
+
+  const option: vscode.DecorationOptions = { hoverMessage: hover, range };
+  if (inline !== undefined) {
+    option.renderOptions = {
+      after: {
+        color: new vscode.ThemeColor(THEME_COLOR[color]),
+        contentText: `  ${inline}`,
+        fontStyle: "italic",
+      },
+    };
+  }
+  return option;
 }
 
 function makeType(color: StatusColor): vscode.TextEditorDecorationType {

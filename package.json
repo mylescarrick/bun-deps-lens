@@ -2,6 +2,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.2",
     "@types/bun": "latest",
+    "@types/semver": "^7.7.1",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.2.0",
     "typescript": "^7.0.2",
@@ -20,7 +21,7 @@
     "publish": "vsce publish --no-dependencies",
     "vscode:prepublish": "bun run build"
   },
-  "version": "0.1.1",
+  "version": "0.1.2",
   "displayName": "Bun Deps",
   "description": "Inline colour-coded dependency status for package.json, powered by Bun's outdated & audit CLIs.",
   "publisher": "myles-carrick",
@@ -103,5 +104,8 @@
         }
       }
     }
+  },
+  "dependencies": {
+    "semver": "^7.8.5"
   }
 }

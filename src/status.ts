@@ -63,6 +63,25 @@ function computeStatus(
   };
 }
 
+export const PENDING_INLINE = "● run bun i to apply";
+
+export function pendingTooltip(
+  name: string,
+  declared: string,
+  installed?: string
+): string {
+  const lines = [
+    "$(package) **Bun Deps**",
+    "",
+    `**${name}**`,
+    "Run `bun i` to apply your change.",
+    installed === undefined
+      ? `Declared \`${declared}\` is not installed yet.`
+      : `Declared \`${declared}\`, installed \`${installed}\`.`,
+  ];
+  return lines.join("\n");
+}
+
 // Short label rendered inline after the dependency line. Green is intentionally
 // silent — the coloured value text already says "nothing to do here".
 export function inlineLabel(status: DepStatus): string | undefined {

@@ -8,37 +8,54 @@ import {
   MIN_BUN_VERSION,
 } from "./bun/runner";
 import { DepDecorator } from "./decorations";
+import { computePending } from "./installed";
 import { findDependencyLocations } from "./package-json";
 import type { DepStatus, Severity } from "./types";
 
-const DEBOUNCE_MS = 600;
+const ANALYSIS_DEBOUNCE_MS = 600;
+const RENDER_DEBOUNCE_MS = 200;
 
 let decorator: DepDecorator;
 let output: vscode.OutputChannel;
-const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const analysisCache = new Map<string, Map<string, DepStatus>>();
+const analysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const renderTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let bunUnavailableWarned = false;
 
 export function activate(context: vscode.ExtensionContext): void {
   decorator = new DepDecorator();
   output = vscode.window.createOutputChannel("Bun Deps");
-  context.subscriptions.push(decorator, output);
+  const lockWatcher = vscode.workspace.createFileSystemWatcher("**/bun.lock*");
+  context.subscriptions.push(decorator, output, lockWatcher);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("bunDeps.refresh", () => {
       const editor = vscode.window.activeTextEditor;
       if (editor && isPackageJson(editor.document)) {
-        refresh(editor).catch(reportError);
+        runAnalysis(editor).catch(reportError);
       }
     }),
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor && isPackageJson(editor.document)) {
-        scheduleRefresh(editor);
+        scheduleAnalysis(editor);
       }
     }),
-    vscode.workspace.onDidSaveTextDocument((doc) => {
-      forEachEditor(doc, (editor) => scheduleRefresh(editor));
+    // Live edits re-render immediately (cheap, no network) so the pending-install
+    // hint appears as you type; the registry data comes from the cache.
+    vscode.workspace.onDidChangeTextDocument((event) => {
+      forEachEditor(event.document, scheduleRender);
     }),
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      forEachEditor(doc, scheduleAnalysis);
+    }),
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      analysisCache.delete(doc.uri.toString());
+    }),
+    // `bun i` (or any install) rewrites the lockfile — re-analyse so versions
+    // and the pending hint reflect the new install.
+    lockWatcher.onDidChange(refreshAllVisible),
+    lockWatcher.onDidCreate(refreshAllVisible),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("bunDeps")) {
         refreshAllVisible();
@@ -51,10 +68,11 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): void {
-  for (const timer of debounceTimers.values()) {
+  for (const timer of [...analysisTimers.values(), ...renderTimers.values()]) {
     clearTimeout(timer);
   }
-  debounceTimers.clear();
+  analysisTimers.clear();
+  renderTimers.clear();
   if (refreshTimer) {
     clearInterval(refreshTimer);
   }
@@ -85,27 +103,79 @@ function forEachEditor(
 function refreshAllVisible(): void {
   for (const editor of vscode.window.visibleTextEditors) {
     if (isPackageJson(editor.document)) {
-      scheduleRefresh(editor);
+      scheduleAnalysis(editor);
     }
   }
 }
 
-function scheduleRefresh(editor: vscode.TextEditor): void {
-  const key = editor.document.uri.toString();
-  const existing = debounceTimers.get(key);
+function debounce(
+  timers: Map<string, ReturnType<typeof setTimeout>>,
+  key: string,
+  delay: number,
+  fn: () => void
+): void {
+  const existing = timers.get(key);
   if (existing) {
     clearTimeout(existing);
   }
-  debounceTimers.set(
+  timers.set(
     key,
     setTimeout(() => {
-      debounceTimers.delete(key);
-      refresh(editor).catch(reportError);
-    }, DEBOUNCE_MS)
+      timers.delete(key);
+      fn();
+    }, delay)
   );
 }
 
-async function refresh(editor: vscode.TextEditor): Promise<void> {
+function scheduleAnalysis(editor: vscode.TextEditor): void {
+  debounce(
+    analysisTimers,
+    editor.document.uri.toString(),
+    ANALYSIS_DEBOUNCE_MS,
+    () => runAnalysis(editor).catch(reportError)
+  );
+}
+
+function scheduleRender(editor: vscode.TextEditor): void {
+  debounce(
+    renderTimers,
+    editor.document.uri.toString(),
+    RENDER_DEBOUNCE_MS,
+    () => renderEditor(editor)
+  );
+}
+
+// Cheap: re-parse the live text, recompute the pending-install hint from
+// node_modules, and render using whatever registry data is already cached.
+function renderEditor(editor: vscode.TextEditor): void {
+  const cfg = config();
+  if (!cfg.get<boolean>("enable", true)) {
+    decorator.clear(editor);
+    return;
+  }
+
+  const doc = editor.document;
+  const locations = findDependencyLocations(doc.getText());
+  if (locations.length === 0) {
+    decorator.clear(editor);
+    return;
+  }
+
+  const statuses = analysisCache.get(doc.uri.toString()) ?? new Map();
+  const pending = computePending(dirname(doc.uri.fsPath), locations);
+  if (doc.isClosed) {
+    return;
+  }
+  decorator.render(
+    editor,
+    locations,
+    statuses,
+    cfg.get<boolean>("showInlineVersions", true),
+    pending
+  );
+}
+
+async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
   const cfg = config();
   if (!cfg.get<boolean>("enable", true)) {
     decorator.clear(editor);
@@ -127,9 +197,9 @@ async function refresh(editor: vscode.TextEditor): Promise<void> {
   const depNames = [...new Set(locations.map((loc) => loc.name))];
   const severityThreshold = cfg.get<Severity>("severityThreshold", "high");
 
-  let statuses: Map<string, DepStatus>;
   try {
-    statuses = await analyze(cwd, depNames, severityThreshold);
+    const statuses = await analyze(cwd, depNames, severityThreshold);
+    analysisCache.set(doc.uri.toString(), statuses);
   } catch (error) {
     if (error instanceof BunNotFoundError) {
       warnBunUnavailable(error.message);
@@ -139,15 +209,9 @@ async function refresh(editor: vscode.TextEditor): Promise<void> {
     return;
   }
 
-  if (editor.document.isClosed) {
-    return;
+  if (!doc.isClosed) {
+    renderEditor(editor);
   }
-  decorator.render(
-    editor,
-    locations,
-    statuses,
-    cfg.get<boolean>("showInlineVersions", true)
-  );
 }
 
 async function ensureBunAvailable(): Promise<boolean> {

@@ -4,13 +4,35 @@ A Bun-only VS Code extension that annotates `package.json` with inline,
 colour-coded dependency status, powered entirely by the `bun` CLI already on
 your `PATH` — no bundled network client.
 
-- 🟢 **Green** — on the latest published version.
-- 🟠 **Amber** — outdated, with a faint `current → latest` hint after the line.
-- 🔴 **Red** — a vulnerability at or above your configured severity threshold
-  (`bun audit`), regardless of how out of date it is.
+The version string itself is coloured, and outdated/vulnerable dependencies get
+a short inline status message after the line:
 
-Hover any dependency for a tooltip with the version transition and advisory
+- 🟢 **Green** — on the latest published version (no inline message; the green
+  value says it all).
+- 🟠 **Amber** — outdated: `● current → latest`.
+- 🔴 **Red** — a vulnerability at or above your configured severity threshold
+  (`bun audit`), regardless of how out of date it is: `● <severity> vuln ·
+  current → latest`.
+
+Two extra behaviours:
+
+- **Live updates** — annotations refresh as you edit `package.json`, not just on
+  save.
+- **Pending-install hint** — if you change a version range to something that
+  isn't installed yet, the value turns amber with `● run bun i to apply`. It
+  clears automatically once you run `bun i`.
+
+Hover any dependency for a tooltip (headed **Bun Deps**, to distinguish it from
+VS Code's built-in package.json hover) with the version transition and advisory
 details.
+
+## Install
+
+Install **Bun Deps** from the VS Code Marketplace, or:
+
+```sh
+code --install-extension myles-carrick.bun-deps
+```
 
 ## Requirements
 
@@ -46,15 +68,21 @@ Press <kbd>F5</kbd> to launch the Extension Development Host, then open a
 
 ## How it works
 
-The extension never talks to a registry directly. On open/save (debounced) it
-runs `bun outdated` and `bun audit --json` in the package directory, parses
-their output, and renders decorations:
+The extension never talks to a registry directly. It runs `bun outdated` and
+`bun audit --json` in the package directory (debounced, cached), parses their
+output, and renders decorations:
 
 - `bun outdated` has no `--json` flag as of Bun 1.3.x, so its pipe-delimited
   table (`Package | Current | Update | Latest`, with `(dev)` markers) is
   parsed directly.
 - `bun audit --json` returns advisories keyed by package name; presence means
   the installed version is vulnerable.
+
+The registry analysis runs on save, on a background interval, and via the
+refresh command. Editing re-renders instantly from cached data — the
+pending-install hint is computed locally by comparing the edited range against
+the version in `node_modules` (via `semver`), with no network call. A watcher
+on `bun.lock` triggers a fresh analysis once an install completes.
 
 ## Roadmap
 

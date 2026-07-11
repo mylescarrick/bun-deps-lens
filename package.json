@@ -4,7 +4,7 @@
     "@types/bun": "latest",
     "@types/vscode": "^1.90.0",
     "@vscode/vsce": "^3.2.0",
-    "typescript": "^5.9.0",
+    "typescript": "^7.0.2",
     "ultracite": "7.9.3"
   },
   "name": "bun-deps",

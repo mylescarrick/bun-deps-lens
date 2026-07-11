@@ -1,6 +1,12 @@
 # Changelog
 
-## [0.1.2] - Unreleased
+## [0.1.3]
+
+- Documentation only: refresh the README (and Marketplace listing) for the
+  coloured version text, live re-render, pending-install hint, and install
+  instructions.
+
+## [0.1.2]
 
 - Re-render annotations live as you edit `package.json` (no save required),
   instead of only on save.

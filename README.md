@@ -63,8 +63,18 @@ bun run typecheck    # tsc --noEmit
 bun run lint         # ultracite (Biome) check
 ```
 
-Press <kbd>F5</kbd> to launch the Extension Development Host, then open a
-`package.json` in a Bun project.
+### Testing in VS Code
+
+1. Build the extension: `bun run build:dev` (or use the `npm: watch` task).
+2. Run `bun run setup:fixtures` to install dependencies for the fixture
+   projects under [`fixtures/`](./fixtures).
+3. Press <kbd>F5</kbd> to launch the Extension Development Host.
+4. In the new VS Code window, open a fixture folder
+   (e.g. `File → Open Folder… → fixtures/monorepo-catalog`) and open its
+   `package.json`.
+
+The Debug panel also has ready-made launch entries for each fixture
+(`Run Extension (monorepo-catalog fixture)`, etc.) so you can skip step 4.
 
 ## How it works
 
@@ -88,7 +98,10 @@ on `bun.lock` triggers a fresh analysis once an install completes.
 
 - **v1.1** — `bunfig.toml` `minimumReleaseAge` cooldown awareness + tooltips,
   gutter dots.
-- **v1.2** — monorepo / workspace support and `catalog:` resolution.
+- **v1.2** — monorepo / workspace support: default and named catalogs
+  (`workspaces.catalog` and `workspaces.catalogs`), workspace-column `bun
+  outdated` parsing, and lockfile-aware pending-install hints for
+  platform-skipped packages.
 - **v2** — quick-fix version bumps and a status-bar summary.
 
 ## License

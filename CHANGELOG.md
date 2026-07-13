@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0]
+
+- Add monorepo catalog support: decorate entries under `workspaces.catalog`
+  and `workspaces.catalogs` (named catalogs), and resolve `catalog:` versions
+  in standard dependency sections.
+- Parse the extra `Workspace` column emitted by `bun outdated` in workspace
+  projects, so version comparisons (e.g. `27.0.2` → `28.0.0`) work in monorepos.
+- Avoid false "run `bun i` to apply" hints when a declared package is resolved
+  in the lockfile but intentionally not installed on disk (platform-specific
+  optional packages such as `@esbuild/linux-arm64` on macOS).
+- Emit debug and progress messages to the **Bun Deps** output channel.
+
 ## [0.1.4]
 
 - Fix a stale `bun.lock` (pinned `@biomejs/biome` version) that broke the

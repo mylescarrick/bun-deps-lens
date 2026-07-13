@@ -1,0 +1,10 @@
+{
+  "name": "fixture-app",
+  "dependencies": {
+    "lodash": "4.17.20"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "esbuild": "catalog:build"
+  }
+}

@@ -12,6 +12,25 @@ const PKG = `{
   }
 }`;
 
+const PKG_WITH_CATALOG = `{
+  "name": "root",
+  "workspaces": {
+    "packages": ["packages/*"],
+    "catalog": {
+      "typescript": "^5.5.0",
+      "eslint": "^9.0.0"
+    },
+    "catalogs": {
+      "build": {
+        "webpack": "5.88.2"
+      }
+    }
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}`;
+
 describe("findDependencyLocations", () => {
   test("finds deps across dependency sections", () => {
     const locations = findDependencyLocations(PKG);
@@ -43,5 +62,25 @@ describe("findDependencyLocations", () => {
 
   test("returns nothing when there are no dependency sections", () => {
     expect(findDependencyLocations('{"name":"x"}')).toEqual([]);
+  });
+
+  test("finds catalog entries under workspaces.catalog", () => {
+    const locations = findDependencyLocations(PKG_WITH_CATALOG);
+    const names = locations.map((loc) => loc.name);
+    expect(names).toContain("typescript");
+    expect(names).toContain("eslint");
+    const catalogEslint = locations.find(
+      (loc) => loc.name === "eslint" && loc.section === "workspaces.catalog"
+    );
+    expect(catalogEslint?.declaredRange).toBe("^9.0.0");
+  });
+
+  test("finds entries in named catalogs under workspaces.catalogs", () => {
+    const locations = findDependencyLocations(PKG_WITH_CATALOG);
+    const webpack = locations.find(
+      (loc) => loc.name === "webpack" && loc.section === "workspaces.catalogs"
+    );
+    expect(webpack).toBeDefined();
+    expect(webpack?.declaredRange).toBe("5.88.2");
   });
 });

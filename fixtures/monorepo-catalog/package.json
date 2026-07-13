@@ -1,0 +1,26 @@
+{
+  "name": "fixture-monorepo-catalog",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "catalog": {
+      "@biomejs/biome": "2.4.14",
+      "typescript": "^5.4.5"
+    },
+    "catalogs": {
+      "build": {
+        "esbuild": "^0.20.0"
+      }
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "typescript": "catalog:",
+    "esbuild": "catalog:build",
+    "ts-morph": "^23.0.0",
+    "@esbuild/darwin-arm64": "0.20.2",
+    "@esbuild/linux-arm64": "0.20.2"
+  }
+}

@@ -6,7 +6,9 @@ export type DepSection =
   | "dependencies"
   | "devDependencies"
   | "peerDependencies"
-  | "optionalDependencies";
+  | "optionalDependencies"
+  | "workspaces.catalog"
+  | "workspaces.catalogs";
 
 export interface OutdatedEntry {
   current: string;

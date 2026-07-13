@@ -166,6 +166,9 @@ function renderEditor(editor: vscode.TextEditor): void {
   if (doc.isClosed) {
     return;
   }
+  output.appendLine(
+    `[render] ${doc.fileName}: ${locations.length} deps, ${statuses.size} analysed, ${pending.size} pending install`
+  );
   decorator.render(
     editor,
     locations,
@@ -187,6 +190,9 @@ async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
   const locations = findDependencyLocations(doc.getText());
   if (locations.length === 0) {
     decorator.clear(editor);
+    output.appendLine(
+      `[analyze] ${doc.fileName}: no dependency sections found`
+    );
     return;
   }
 
@@ -196,10 +202,20 @@ async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
 
   const depNames = [...new Set(locations.map((loc) => loc.name))];
   const severityThreshold = cfg.get<Severity>("severityThreshold", "high");
+  output.appendLine(
+    `[analyze] ${doc.fileName} in ${cwd}: checking ${depNames.length} dep(s)`
+  );
 
   try {
     const statuses = await analyze(cwd, depNames, severityThreshold);
     analysisCache.set(doc.uri.toString(), statuses);
+    const outdated = [...statuses.values()].filter((s) => s.outdated).length;
+    const vulnerable = [...statuses.values()].filter(
+      (s) => s.color === "red"
+    ).length;
+    output.appendLine(
+      `[analyze] ${doc.fileName}: ${statuses.size} status(es), ${outdated} outdated, ${vulnerable} vulnerable`
+    );
   } catch (error) {
     if (error instanceof BunNotFoundError) {
       warnBunUnavailable(error.message);
@@ -220,6 +236,7 @@ async function ensureBunAvailable(): Promise<boolean> {
     warnBunUnavailable('Could not find "bun" on PATH.');
     return false;
   }
+  output.appendLine(`[bun] detected version ${version}`);
   if (!isVersionAtLeast(version, MIN_BUN_VERSION)) {
     output.appendLine(
       `Bun ${version} is older than the supported minimum ${MIN_BUN_VERSION}; results may be incomplete.`
@@ -233,7 +250,7 @@ function reportError(error: unknown): void {
 }
 
 function warnBunUnavailable(message: string): void {
-  output.appendLine(message);
+  output.appendLine(`[bun] ${message}`);
   if (!bunUnavailableWarned) {
     bunUnavailableWarned = true;
     vscode.window.showWarningMessage(

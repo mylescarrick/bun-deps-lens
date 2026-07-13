@@ -4,9 +4,10 @@ const DEV_MARKER = /\s*\(dev\)\s*$/;
 const SEPARATOR_CELL = /^-+$/;
 const HEADER_KEYS = new Set(["package", "current", "update", "latest"]);
 
-// `bun outdated` has no --json flag (as of Bun 1.3.x); it always prints a
+// `bun outdated` has no --json flag (as of Bun 1.3.x); it prints a
 // pipe-delimited table with columns: Package | Current | Update | Latest.
-// Dev dependencies carry a " (dev)" suffix in the Package cell.
+// In workspace projects Bun appends a Workspace column. Dev dependencies carry
+// a " (dev)" suffix in the Package cell.
 export function parseOutdated(stdout: string): OutdatedEntry[] {
   const entries: OutdatedEntry[] = [];
 
@@ -21,7 +22,10 @@ export function parseOutdated(stdout: string): OutdatedEntry[] {
       .slice(1, -1)
       .map((cell) => cell.trim());
 
-    if (cells.length !== 4 || isSeparatorRow(cells)) {
+    if (cells.length !== 4 && cells.length !== 5) {
+      continue;
+    }
+    if (isSeparatorRow(cells) || isHeaderRow(cells)) {
       continue;
     }
 
@@ -32,10 +36,6 @@ export function parseOutdated(stdout: string): OutdatedEntry[] {
       string,
     ];
 
-    if (HEADER_KEYS.has(packageCell.toLowerCase())) {
-      continue;
-    }
-
     const dev = DEV_MARKER.test(packageCell);
     const name = packageCell.replace(DEV_MARKER, "").trim();
 
@@ -45,6 +45,11 @@ export function parseOutdated(stdout: string): OutdatedEntry[] {
   }
 
   return entries;
+}
+
+function isHeaderRow(cells: string[]): boolean {
+  const [first] = cells;
+  return first !== undefined && HEADER_KEYS.has(first.toLowerCase());
 }
 
 function isSeparatorRow(cells: string[]): boolean {

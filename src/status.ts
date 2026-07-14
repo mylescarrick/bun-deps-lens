@@ -3,6 +3,7 @@ import type {
   Advisory,
   AuditMap,
   DepStatus,
+  HoistConflict,
   OutdatedEntry,
   Severity,
 } from "./types";
@@ -64,6 +65,34 @@ function computeStatus(
 }
 
 export const PENDING_INLINE = "● run bun i to apply";
+
+// Compact inline note for a catalog entry whose hoisted root copy differs from
+// the catalog resolution, naming the workspace responsible when we know it.
+export function conflictInline(conflict: HoistConflict): string {
+  const [dependent] = conflict.dependents;
+  return dependent === undefined
+    ? `⚠ hoisted ${conflict.hoisted}`
+    : `⚠ hoisted ${conflict.hoisted} via ${dependent.workspace}`;
+}
+
+export function conflictTooltip(conflict: HoistConflict): string {
+  const lines = [
+    "**Hoisted version conflict**",
+    `Installed at the workspace root: \`${conflict.hoisted}\` — does not match the catalog resolution.`,
+  ];
+  if (conflict.dependents.length > 0) {
+    const via = conflict.dependents
+      .map(
+        (dependent) => `\`${dependent.workspace}\` pins \`${dependent.spec}\``
+      )
+      .join(", ");
+    lines.push(
+      `Cause: ${via} directly. That copy is hoisted to the root, so tools resolving from the root see it instead of the catalog version.`,
+      "Fix: switch that workspace to `catalog:` (or align its version), then run `bun i`."
+    );
+  }
+  return lines.join("\n");
+}
 
 export function pendingTooltip(
   name: string,

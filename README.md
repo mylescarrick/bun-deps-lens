@@ -21,6 +21,11 @@ Two extra behaviours:
 - **Pending-install hint** — if you change a version range to something that
   isn't installed yet, the value turns amber with `● run bun i to apply`. It
   clears automatically once you run `bun i`.
+- **Catalog-aware monorepo hints** — `workspaces.catalog` and named catalog
+  entries are checked against `bun.lock` (not the hoisted `node_modules` copy),
+  so unused catalog entries do not nag. If a workspace pins a different version
+  directly and that copy is hoisted to the root, the inline note names the
+  workspace responsible, e.g. `⚠ hoisted 4.20251125.0 via packages/tools`.
 
 Hover any dependency for a tooltip (headed **Bun Deps**, to distinguish it from
 VS Code's built-in package.json hover) with the version transition and advisory
@@ -90,9 +95,12 @@ output, and renders decorations:
 
 The registry analysis runs on save, on a background interval, and via the
 refresh command. Editing re-renders instantly from cached data — the
-pending-install hint is computed locally by comparing the edited range against
-the version in `node_modules` (via `semver`), with no network call. A watcher
-on `bun.lock` triggers a fresh analysis once an install completes.
+pending-install hint is computed locally, with no network call. Standard
+package ranges are compared against the installed version in `node_modules`
+(via `semver`); catalog declarations are resolved from an in-process,
+mtime-cached `bun.lock` index so hoisted workspace copies do not create false
+"run `bun i`" hints. A watcher on `bun.lock` triggers a fresh analysis once an
+install completes.
 
 ## Roadmap
 
@@ -102,6 +110,7 @@ on `bun.lock` triggers a fresh analysis once an install completes.
   (`workspaces.catalog` and `workspaces.catalogs`), workspace-column `bun
   outdated` parsing, and lockfile-aware pending-install hints for
   platform-skipped packages.
+- **v1.3** — identify unused catalog entries explicitly.
 - **v2** — quick-fix version bumps and a status-bar summary.
 
 ## License

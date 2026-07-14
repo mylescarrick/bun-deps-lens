@@ -8,7 +8,7 @@ import {
   MIN_BUN_VERSION,
 } from "./bun/runner";
 import { DepDecorator } from "./decorations";
-import { computePending } from "./installed";
+import { computeAnnotations } from "./installed";
 import { findDependencyLocations } from "./package-json";
 import type { DepStatus, Severity } from "./types";
 
@@ -162,19 +162,23 @@ function renderEditor(editor: vscode.TextEditor): void {
   }
 
   const statuses = analysisCache.get(doc.uri.toString()) ?? new Map();
-  const pending = computePending(dirname(doc.uri.fsPath), locations);
+  const { pending, conflicts } = computeAnnotations(
+    dirname(doc.uri.fsPath),
+    locations
+  );
   if (doc.isClosed) {
     return;
   }
   output.appendLine(
-    `[render] ${doc.fileName}: ${locations.length} deps, ${statuses.size} analysed, ${pending.size} pending install`
+    `[render] ${doc.fileName}: ${locations.length} deps, ${statuses.size} analysed, ${pending.size} pending install, ${conflicts.size} catalog conflict(s)`
   );
   decorator.render(
     editor,
     locations,
     statuses,
     cfg.get<boolean>("showInlineVersions", true),
-    pending
+    pending,
+    conflicts
   );
 }
 

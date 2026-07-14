@@ -22,7 +22,7 @@
     "publish": "vsce publish --no-dependencies",
     "vscode:prepublish": "bun run build"
   },
-  "version": "0.2.0",
+  "version": "0.2.1",
   "displayName": "Bun Deps",
   "description": "Inline colour-coded dependency status for package.json, powered by Bun's outdated & audit CLIs.",
   "publisher": "myles-carrick",

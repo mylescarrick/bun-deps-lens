@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { isPending } from "../src/installed";
+import { computeAnnotations, isPending } from "../src/installed";
+import type { DepLocation } from "../src/types";
 
 describe("isPending", () => {
   test("pending when installed doesn't satisfy the changed range", () => {
@@ -41,5 +42,122 @@ describe("isPending", () => {
     expect(isPending("a", "latest", "1.0.0")).toBe(false);
     expect(isPending("a", "*", "1.0.0")).toBe(false);
     expect(isPending("a", "npm:react@18", "1.0.0")).toBe(false);
+  });
+});
+
+function catalogLocation(name: string, declaredRange: string): DepLocation {
+  return {
+    declaredRange,
+    name,
+    section: "workspaces.catalog",
+    valueEndCol: 0,
+    valueEndLine: 0,
+    valueStartCol: 0,
+    valueStartLine: 0,
+  };
+}
+
+function installPackage(root: string, name: string, version: string): void {
+  const dir = join(root, "node_modules", ...name.split("/"));
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name, version }));
+}
+
+describe("computeAnnotations catalog entries", () => {
+  test("resolved catalog with a hoisted mismatch reports a conflict, not pending", () => {
+    const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
+    writeFileSync(
+      join(root, "bun.lock"),
+      JSON.stringify({
+        lockfileVersion: 1,
+        packages: {
+          "@cloudflare/workers-types": [
+            "@cloudflare/workers-types@4.20251125.0",
+          ],
+          "archive/@cloudflare/workers-types": [
+            "@cloudflare/workers-types@4.20260617.1",
+          ],
+        },
+        workspaces: {
+          "": {
+            devDependencies: { "@cloudflare/workers-types": "catalog:" },
+          },
+          "packages/tools": {
+            devDependencies: {
+              "@cloudflare/workers-types": "4.20251125.0",
+            },
+          },
+        },
+      })
+    );
+    installPackage(root, "@cloudflare/workers-types", "4.20251125.0");
+
+    const { pending, conflicts } = computeAnnotations(root, [
+      catalogLocation("@cloudflare/workers-types", "4.20260617.1"),
+    ]);
+
+    expect(pending.has("@cloudflare/workers-types")).toBe(false);
+    expect(conflicts.get("@cloudflare/workers-types")).toEqual({
+      dependents: [{ spec: "4.20251125.0", workspace: "packages/tools" }],
+      hoisted: "4.20251125.0",
+    });
+  });
+
+  test("unused catalog entry is neither pending nor conflicting", () => {
+    const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
+    writeFileSync(
+      join(root, "bun.lock"),
+      JSON.stringify({
+        lockfileVersion: 1,
+        packages: {},
+        workspaces: { "": { devDependencies: { turbo: "^2.9.14" } } },
+      })
+    );
+
+    const { pending, conflicts } = computeAnnotations(root, [
+      catalogLocation("@hono/swagger-ui", "^0.5.3"),
+    ]);
+
+    expect(pending.size).toBe(0);
+    expect(conflicts.size).toBe(0);
+  });
+
+  test("consumed catalog with no satisfying resolution is pending", () => {
+    const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
+    writeFileSync(
+      join(root, "bun.lock"),
+      JSON.stringify({
+        lockfileVersion: 1,
+        packages: { foo: ["foo@1.5.0"] },
+        workspaces: { "": { dependencies: { foo: "catalog:" } } },
+      })
+    );
+
+    const { pending, conflicts } = computeAnnotations(root, [
+      catalogLocation("foo", "^2.0.0"),
+    ]);
+
+    expect(pending.get("foo")).toEqual({ declared: "^2.0.0" });
+    expect(conflicts.size).toBe(0);
+  });
+
+  test("cleanly resolved catalog produces no annotations", () => {
+    const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
+    writeFileSync(
+      join(root, "bun.lock"),
+      JSON.stringify({
+        lockfileVersion: 1,
+        packages: { bar: ["bar@1.2.0"] },
+        workspaces: { "": { dependencies: { bar: "catalog:" } } },
+      })
+    );
+    installPackage(root, "bar", "1.2.0");
+
+    const { pending, conflicts } = computeAnnotations(root, [
+      catalogLocation("bar", "^1.0.0"),
+    ]);
+
+    expect(pending.size).toBe(0);
+    expect(conflicts.size).toBe(0);
   });
 });

@@ -1,7 +1,18 @@
 import * as vscode from "vscode";
 import type { Pending } from "./installed";
-import { inlineLabel, PENDING_INLINE, pendingTooltip } from "./status";
-import type { DepLocation, DepStatus, StatusColor } from "./types";
+import {
+  conflictInline,
+  conflictTooltip,
+  inlineLabel,
+  PENDING_INLINE,
+  pendingTooltip,
+} from "./status";
+import type {
+  DepLocation,
+  DepStatus,
+  HoistConflict,
+  StatusColor,
+} from "./types";
 
 // Theme-aware chart colours adapt across light/dark/high-contrast themes.
 const THEME_COLOR: Record<StatusColor, string> = {
@@ -26,7 +37,8 @@ export class DepDecorator implements vscode.Disposable {
     locations: DepLocation[],
     statuses: Map<string, DepStatus>,
     showInlineVersions: boolean,
-    pending: Map<string, Pending>
+    pending: Map<string, Pending>,
+    conflicts: Map<string, HoistConflict>
   ): void {
     const buckets: Record<StatusColor, vscode.DecorationOptions[]> = {
       amber: [],
@@ -60,16 +72,27 @@ export class DepDecorator implements vscode.Disposable {
       }
 
       const status = statuses.get(location.name);
-      if (status === undefined) {
+      const conflict = conflicts.get(location.name);
+      if (status === undefined && conflict === undefined) {
         continue;
       }
 
-      buckets[status.color].push(
+      const color = status?.color ?? "amber";
+      let tooltip =
+        status?.tooltip ?? `$(package) **Bun Deps**\n\n**${location.name}**`;
+      let inline = status ? inlineLabel(status) : undefined;
+      if (conflict !== undefined) {
+        tooltip = `${tooltip}\n\n${conflictTooltip(conflict)}`;
+        const note = conflictInline(conflict);
+        inline = inline === undefined ? `● ${note}` : `${inline} · ${note}`;
+      }
+
+      buckets[color].push(
         decoration(
           valueRange,
-          status.tooltip,
-          showInlineVersions ? inlineLabel(status) : undefined,
-          status.color
+          tooltip,
+          showInlineVersions ? inline : undefined,
+          color
         )
       );
     }

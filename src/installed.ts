@@ -1,13 +1,26 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { satisfies, validRange } from "semver";
-import type { DepLocation } from "./types";
+import {
+  findLockfile,
+  type LockfileIndex,
+  loadLockfileIndex,
+} from "./bun/lockfile";
+import type { DepLocation, HoistConflict } from "./types";
 
-const LOCKFILE_NAMES = ["bun.lock", "bun.lockb"] as const;
+const CATALOG_SECTIONS = new Set<string>([
+  "workspaces.catalog",
+  "workspaces.catalogs",
+]);
 
 export interface Pending {
   declared: string;
   installed?: string;
+}
+
+export interface Annotations {
+  conflicts: Map<string, HoistConflict>;
+  pending: Map<string, Pending>;
 }
 
 // True when the declared range is a real semver range that the installed
@@ -38,39 +51,18 @@ export function isPending(
 
 function isResolved(lockfileRoot: string, name: string, spec: string): boolean {
   const lockfile = findLockfile(lockfileRoot);
-  if (lockfile === null) {
-    return false;
-  }
-  if (lockfile.endsWith(".lockb")) {
+  if (lockfile === null || lockfile.endsWith(".lockb")) {
     // Binary lockfiles can't be cheaply inspected here; fall back to the
     // installed check and let bun outdated/audit surface real misses.
     return false;
   }
   try {
     const text = readFileSync(lockfile, "utf8");
-    // Text-format bun.lock headers look like "# <name>@<version>" and package
-    // entries look like "<name>": ["<name>@<version>", ...]. Searching for the
+    // Package entries carry the descriptor "<name>@<version>"; finding the
     // package@spec literal tells us bun has resolved this dependency.
     return text.includes(`${name}@${spec}`);
   } catch {
     return false;
-  }
-}
-
-function findLockfile(startDir: string): string | null {
-  let dir = startDir;
-  for (;;) {
-    for (const name of LOCKFILE_NAMES) {
-      const candidate = join(dir, name);
-      if (existsSync(candidate)) {
-        return candidate;
-      }
-    }
-    const parent = dirname(dir);
-    if (parent === dir) {
-      return null;
-    }
-    dir = parent;
   }
 }
 
@@ -104,16 +96,93 @@ export function readInstalledVersion(
   }
 }
 
-export function computePending(
+type CatalogState =
+  | { conflict?: HoistConflict; kind: "applied" }
+  | { kind: "pending" }
+  | { kind: "unused" };
+
+// Catalog entries are declarations, not direct dependencies of the package
+// they sit in, so the hoisted node_modules copy is the wrong signal. Classify
+// them against the lockfile's actual resolution instead.
+function classifyCatalogEntry(
+  name: string,
+  declaredRange: string,
+  index: LockfileIndex,
+  installed?: string
+): CatalogState {
+  const range = declaredRange.trim();
+  if (range === "" || range.includes(":") || validRange(range) === null) {
+    return { kind: "applied" };
+  }
+  // No workspace references this catalog entry — it installs nothing, so it's
+  // neither pending nor a problem, just unused.
+  if (index.catalogConsumers(name).length === 0) {
+    return { kind: "unused" };
+  }
+  const satisfied = index
+    .resolvedVersions(name)
+    .some((version) => satisfies(version, range, { includePrerelease: true }));
+  if (!satisfied) {
+    return { kind: "pending" };
+  }
+  // Catalog is resolved. If the hoisted root copy is a different version, some
+  // workspace pins it directly and that copy shadows the catalog at the root.
+  if (
+    installed !== undefined &&
+    !satisfies(installed, range, { includePrerelease: true })
+  ) {
+    const dependents = index
+      .directDependents(name)
+      .filter((dependent) => versionMatches(installed, dependent.spec));
+    return { conflict: { dependents, hoisted: installed }, kind: "applied" };
+  }
+  return { kind: "applied" };
+}
+
+function versionMatches(version: string, spec: string): boolean {
+  if (version === spec) {
+    return true;
+  }
+  return (
+    validRange(spec) !== null &&
+    satisfies(version, spec, { includePrerelease: true })
+  );
+}
+
+export function computeAnnotations(
   cwd: string,
   locations: DepLocation[]
-): Map<string, Pending> {
-  const lockfileRoot = findLockfileRoot(cwd);
+): Annotations {
+  const loaded = loadLockfileIndex(cwd);
   const pending = new Map<string, Pending>();
+  const conflicts = new Map<string, HoistConflict>();
+
   for (const location of locations) {
     const installed = readInstalledVersion(cwd, location.name);
+
+    if (CATALOG_SECTIONS.has(location.section)) {
+      if (loaded === undefined) {
+        continue;
+      }
+      const state = classifyCatalogEntry(
+        location.name,
+        location.declaredRange,
+        loaded.index,
+        installed
+      );
+      if (state.kind === "pending") {
+        pending.set(location.name, {
+          declared: location.declaredRange,
+          installed,
+        });
+      } else if (state.kind === "applied" && state.conflict !== undefined) {
+        conflicts.set(location.name, state.conflict);
+      }
+      continue;
+    }
+
     if (
-      isPending(location.name, location.declaredRange, installed, lockfileRoot)
+      isPending(location.name, location.declaredRange, installed, loaded?.root)
     ) {
       pending.set(location.name, {
         declared: location.declaredRange,
@@ -121,13 +190,6 @@ export function computePending(
       });
     }
   }
-  return pending;
-}
 
-function findLockfileRoot(startDir: string): string | undefined {
-  const lockfile = findLockfile(startDir);
-  if (lockfile === null) {
-    return;
-  }
-  return dirname(lockfile);
+  return { conflicts, pending };
 }

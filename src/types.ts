@@ -39,6 +39,11 @@ export interface DepStatus {
   tooltip: string;
 }
 
+export interface HoistConflict {
+  dependents: { spec: string; workspace: string }[];
+  hoisted: string;
+}
+
 export interface DepLocation {
   declaredRange: string;
   name: string;

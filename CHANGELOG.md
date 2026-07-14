@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1]
+
+- Fix false pending-install hints for catalog entries by resolving catalog
+  declarations against `bun.lock` instead of the hoisted `node_modules` copy.
+- Surface catalog hoist conflicts when a workspace pins a different version
+  directly, including the workspace and pinned spec to make the fix actionable.
+- Treat unused catalog entries as already applied for now, so stale catalog
+  declarations no longer say "run `bun i`" when no workspace consumes them.
+
 ## [0.2.0]
 
 - Add monorepo catalog support: decorate entries under `workspaces.catalog`

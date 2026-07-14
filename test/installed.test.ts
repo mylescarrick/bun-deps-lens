@@ -92,18 +92,19 @@ describe("computeAnnotations catalog entries", () => {
     );
     installPackage(root, "@cloudflare/workers-types", "4.20251125.0");
 
-    const { pending, conflicts } = computeAnnotations(root, [
+    const { pending, conflicts, unusedCatalogs } = computeAnnotations(root, [
       catalogLocation("@cloudflare/workers-types", "4.20260617.1"),
     ]);
 
     expect(pending.has("@cloudflare/workers-types")).toBe(false);
+    expect(unusedCatalogs.has("@cloudflare/workers-types")).toBe(false);
     expect(conflicts.get("@cloudflare/workers-types")).toEqual({
       dependents: [{ spec: "4.20251125.0", workspace: "packages/tools" }],
       hoisted: "4.20251125.0",
     });
   });
 
-  test("unused catalog entry is neither pending nor conflicting", () => {
+  test("unused catalog entry is marked unused without pending or conflict", () => {
     const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
     writeFileSync(
       join(root, "bun.lock"),
@@ -114,12 +115,13 @@ describe("computeAnnotations catalog entries", () => {
       })
     );
 
-    const { pending, conflicts } = computeAnnotations(root, [
+    const { pending, conflicts, unusedCatalogs } = computeAnnotations(root, [
       catalogLocation("@hono/swagger-ui", "^0.5.3"),
     ]);
 
     expect(pending.size).toBe(0);
     expect(conflicts.size).toBe(0);
+    expect(unusedCatalogs.has("@hono/swagger-ui")).toBe(true);
   });
 
   test("consumed catalog with no satisfying resolution is pending", () => {
@@ -133,12 +135,13 @@ describe("computeAnnotations catalog entries", () => {
       })
     );
 
-    const { pending, conflicts } = computeAnnotations(root, [
+    const { pending, conflicts, unusedCatalogs } = computeAnnotations(root, [
       catalogLocation("foo", "^2.0.0"),
     ]);
 
     expect(pending.get("foo")).toEqual({ declared: "^2.0.0" });
     expect(conflicts.size).toBe(0);
+    expect(unusedCatalogs.size).toBe(0);
   });
 
   test("cleanly resolved catalog produces no annotations", () => {
@@ -153,11 +156,12 @@ describe("computeAnnotations catalog entries", () => {
     );
     installPackage(root, "bar", "1.2.0");
 
-    const { pending, conflicts } = computeAnnotations(root, [
+    const { pending, conflicts, unusedCatalogs } = computeAnnotations(root, [
       catalogLocation("bar", "^1.0.0"),
     ]);
 
     expect(pending.size).toBe(0);
     expect(conflicts.size).toBe(0);
+    expect(unusedCatalogs.size).toBe(0);
   });
 });

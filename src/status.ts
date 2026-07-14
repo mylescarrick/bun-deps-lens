@@ -65,6 +65,18 @@ function computeStatus(
 }
 
 export const PENDING_INLINE = "● run bun i to apply";
+export const UNUSED_CATALOG_INLINE = "○ unused catalog entry";
+
+export function unusedCatalogTooltip(name: string, declared: string): string {
+  return [
+    "$(package) **Bun Deps**",
+    "",
+    `**${name}**`,
+    "Unused catalog entry.",
+    `Declared \`${declared}\`, but no workspace in \`bun.lock\` references this package via \`catalog:\` or a named catalog.`,
+    "Remove the catalog entry, or switch a workspace dependency to `catalog:` if it should use this version.",
+  ].join("\n");
+}
 
 // Compact inline note for a catalog entry whose hoisted root copy differs from
 // the catalog resolution, naming the workspace responsible when we know it.

@@ -21,6 +21,7 @@ export interface Pending {
 export interface Annotations {
   conflicts: Map<string, HoistConflict>;
   pending: Map<string, Pending>;
+  unusedCatalogs: Set<string>;
 }
 
 // True when the declared range is a real semver range that the installed
@@ -156,6 +157,7 @@ export function computeAnnotations(
   const loaded = loadLockfileIndex(cwd);
   const pending = new Map<string, Pending>();
   const conflicts = new Map<string, HoistConflict>();
+  const unusedCatalogs = new Set<string>();
 
   for (const location of locations) {
     const installed = readInstalledVersion(cwd, location.name);
@@ -175,7 +177,9 @@ export function computeAnnotations(
           declared: location.declaredRange,
           installed,
         });
-      } else if (state.kind === "applied" && state.conflict !== undefined) {
+      } else if (state.kind === "unused") {
+        unusedCatalogs.add(location.name);
+      } else if (state.conflict !== undefined) {
         conflicts.set(location.name, state.conflict);
       }
       continue;
@@ -191,5 +195,5 @@ export function computeAnnotations(
     }
   }
 
-  return { conflicts, pending };
+  return { conflicts, pending, unusedCatalogs };
 }

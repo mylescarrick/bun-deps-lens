@@ -162,7 +162,7 @@ function renderEditor(editor: vscode.TextEditor): void {
   }
 
   const statuses = analysisCache.get(doc.uri.toString()) ?? new Map();
-  const { pending, conflicts } = computeAnnotations(
+  const { pending, conflicts, unusedCatalogs } = computeAnnotations(
     dirname(doc.uri.fsPath),
     locations
   );
@@ -170,7 +170,7 @@ function renderEditor(editor: vscode.TextEditor): void {
     return;
   }
   output.appendLine(
-    `[render] ${doc.fileName}: ${locations.length} deps, ${statuses.size} analysed, ${pending.size} pending install, ${conflicts.size} catalog conflict(s)`
+    `[render] ${doc.fileName}: ${locations.length} deps, ${statuses.size} analysed, ${pending.size} pending install, ${conflicts.size} catalog conflict(s), ${unusedCatalogs.size} unused catalog(s)`
   );
   decorator.render(
     editor,
@@ -178,7 +178,8 @@ function renderEditor(editor: vscode.TextEditor): void {
     statuses,
     cfg.get<boolean>("showInlineVersions", true),
     pending,
-    conflicts
+    conflicts,
+    unusedCatalogs
   );
 }
 

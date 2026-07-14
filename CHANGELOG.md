@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.0]
+
+- Identify unused catalog entries directly in `package.json` with a subdued
+  `○ unused catalog entry` annotation and tooltip.
+
 ## [0.2.1]
 
 - Fix false pending-install hints for catalog entries by resolving catalog

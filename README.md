@@ -23,9 +23,10 @@ Two extra behaviours:
   clears automatically once you run `bun i`.
 - **Catalog-aware monorepo hints** — `workspaces.catalog` and named catalog
   entries are checked against `bun.lock` (not the hoisted `node_modules` copy),
-  so unused catalog entries do not nag. If a workspace pins a different version
-  directly and that copy is hoisted to the root, the inline note names the
-  workspace responsible, e.g. `⚠ hoisted 4.20251125.0 via packages/tools`.
+  so unused catalog entries are shown as `○ unused catalog entry` instead of a
+  false install nag. If a workspace pins a different version directly and that
+  copy is hoisted to the root, the inline note names the workspace responsible,
+  e.g. `⚠ hoisted 4.20251125.0 via packages/tools`.
 
 Hover any dependency for a tooltip (headed **Bun Deps**, to distinguish it from
 VS Code's built-in package.json hover) with the version transition and advisory
@@ -110,7 +111,6 @@ install completes.
   (`workspaces.catalog` and `workspaces.catalogs`), workspace-column `bun
   outdated` parsing, and lockfile-aware pending-install hints for
   platform-skipped packages.
-- **v1.3** — identify unused catalog entries explicitly.
 - **v2** — quick-fix version bumps and a status-bar summary.
 
 ## License

@@ -1,12 +1,13 @@
 import { parseAudit } from "./bun/audit";
 import { parseOutdated } from "./bun/outdated";
 import { runBun } from "./bun/runner";
+import { computeResolvedVersions } from "./installed";
 import { buildStatuses } from "./status";
-import type { DepStatus, Severity } from "./types";
+import type { DepLocation, DepStatus, Severity } from "./types";
 
 export async function analyze(
   cwd: string,
-  depNames: string[],
+  locations: DepLocation[],
   severityThreshold: Severity,
   bunPath = "bun"
 ): Promise<Map<string, DepStatus>> {
@@ -20,5 +21,14 @@ export async function analyze(
   // whatever we got and treat unparseable output as "no vulnerability data".
   const audit = parseAudit(auditResult.stdout);
 
-  return buildStatuses(depNames, outdated, audit, severityThreshold);
+  const depNames = [...new Set(locations.map((loc) => loc.name))];
+  const resolvedVersions = computeResolvedVersions(cwd, locations);
+
+  return buildStatuses(
+    depNames,
+    outdated,
+    audit,
+    severityThreshold,
+    resolvedVersions
+  );
 }

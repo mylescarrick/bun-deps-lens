@@ -42,6 +42,12 @@ describe("parseLockfile", () => {
     ).toEqual(["4.20251125.0", "4.20260617.1"]);
   });
 
+  test("tracks the top-level package version separately from nested copies", () => {
+    expect(index.topLevelResolvedVersion("@cloudflare/workers-types")).toBe(
+      "4.20251125.0"
+    );
+  });
+
   test("lists workspaces that consume a package via catalog:", () => {
     expect(index.catalogConsumers("@cloudflare/workers-types")).toEqual([""]);
     expect(index.catalogConsumers("react")).toEqual(["apps/web"]);
@@ -64,6 +70,7 @@ describe("parseLockfile", () => {
   test("returns an empty index for unparseable input", () => {
     const empty = parseLockfile("# not json @foo@1.0.0");
     expect(empty.resolvedVersions("foo")).toEqual([]);
+    expect(empty.topLevelResolvedVersion("foo")).toBeUndefined();
     expect(empty.catalogConsumers("foo")).toEqual([]);
   });
 });

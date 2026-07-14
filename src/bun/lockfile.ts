@@ -19,6 +19,7 @@ export interface LockfileIndex {
   catalogConsumers: (name: string) => string[];
   directDependents: (name: string) => DirectDependent[];
   resolvedVersions: (name: string) => string[];
+  topLevelResolvedVersion: (name: string) => string | undefined;
 }
 
 interface RawWorkspace {
@@ -129,9 +130,10 @@ function addTo(
 
 function indexPackages(
   raw: RawLockfile,
-  resolved: Map<string, Set<string>>
+  resolved: Map<string, Set<string>>,
+  topLevel: Map<string, string>
 ): void {
-  for (const entry of Object.values(raw.packages ?? {})) {
+  for (const [key, entry] of Object.entries(raw.packages ?? {})) {
     const descriptor = Array.isArray(entry) ? entry[0] : undefined;
     if (typeof descriptor !== "string") {
       continue;
@@ -140,6 +142,9 @@ function indexPackages(
     const version = descriptorVersion(descriptor);
     if (name !== undefined && version !== undefined) {
       addTo(resolved, name, version);
+      if (key === name) {
+        topLevel.set(name, version);
+      }
     }
   }
 }
@@ -185,16 +190,18 @@ export function parseLockfile(text: string): LockfileIndex {
   }
 
   const resolved = new Map<string, Set<string>>();
+  const topLevel = new Map<string, string>();
   const consumers = new Map<string, Set<string>>();
   const directs = new Map<string, DirectDependent[]>();
 
-  indexPackages(raw, resolved);
+  indexPackages(raw, resolved, topLevel);
   indexWorkspaces(raw, consumers, directs);
 
   return {
     catalogConsumers: (name) => [...(consumers.get(name) ?? [])],
     directDependents: (name) => directs.get(name) ?? [],
     resolvedVersions: (name) => [...(resolved.get(name) ?? [])],
+    topLevelResolvedVersion: (name) => topLevel.get(name),
   };
 }
 
@@ -203,6 +210,7 @@ function emptyIndex(): LockfileIndex {
     catalogConsumers: () => [],
     directDependents: () => [],
     resolvedVersions: () => [],
+    topLevelResolvedVersion: () => undefined,
   };
 }
 

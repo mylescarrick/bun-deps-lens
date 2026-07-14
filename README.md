@@ -91,8 +91,10 @@ output, and renders decorations:
 - `bun outdated` has no `--json` flag as of Bun 1.3.x, so its pipe-delimited
   table (`Package | Current | Update | Latest`, with `(dev)` markers) is
   parsed directly.
-- `bun audit --json` returns advisories keyed by package name; presence means
-  the installed version is vulnerable.
+- `bun audit --json` returns advisories keyed by package name. Bun Deps filters
+  those advisories against the resolved version for the decorated dependency so
+  a safe direct/catalog entry is not coloured red just because another nested
+  copy of the same package name is vulnerable.
 
 The registry analysis runs on save, on a background interval, and via the
 refresh command. Editing re-renders instantly from cached data — the

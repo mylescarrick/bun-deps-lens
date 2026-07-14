@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1]
+
+- Fix false vulnerability annotations when `bun audit` reports a package name
+  but the decorated dependency resolves to a safe version (for example,
+  `ws@8.21.0` with vulnerable transitive `ws@8.19.0` copies elsewhere in the
+  lockfile).
+
 ## [0.3.0]
 
 - Identify unused catalog entries directly in `package.json` with a subdued

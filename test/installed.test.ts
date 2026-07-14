@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { computeAnnotations, isPending } from "../src/installed";
+import {
+  computeAnnotations,
+  computeResolvedVersions,
+  isPending,
+} from "../src/installed";
 import type { DepLocation } from "../src/types";
 
 describe("isPending", () => {
@@ -142,6 +146,27 @@ describe("computeAnnotations catalog entries", () => {
     expect(pending.get("foo")).toEqual({ declared: "^2.0.0" });
     expect(conflicts.size).toBe(0);
     expect(unusedCatalogs.size).toBe(0);
+  });
+
+  test("catalog resolved versions prefer top-level copy over nested transitive copies", () => {
+    const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
+    writeFileSync(
+      join(root, "bun.lock"),
+      JSON.stringify({
+        lockfileVersion: 1,
+        packages: {
+          "@cloudflare/puppeteer/ws": ["ws@8.19.0"],
+          ws: ["ws@8.21.0"],
+        },
+        workspaces: { "": { dependencies: { ws: "catalog:" } } },
+      })
+    );
+
+    const versions = computeResolvedVersions(root, [
+      catalogLocation("ws", "^8.21.0"),
+    ]);
+
+    expect(versions.get("ws")).toEqual(["8.21.0"]);
   });
 
   test("cleanly resolved catalog produces no annotations", () => {

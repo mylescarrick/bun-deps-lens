@@ -24,6 +24,8 @@ export interface Annotations {
   unusedCatalogs: Set<string>;
 }
 
+export type ResolvedVersions = Map<string, string[]>;
+
 // True when the declared range is a real semver range that the installed
 // version doesn't satisfy — i.e. the user changed the range (or added a dep)
 // and hasn't run `bun i` yet. Non-semver specifiers (catalog:, workspace:,
@@ -150,6 +152,83 @@ function versionMatches(version: string, spec: string): boolean {
   );
 }
 
+function mergeVersion(
+  versionsByName: ResolvedVersions,
+  name: string,
+  versions: string[]
+): void {
+  if (versions.length === 0) {
+    return;
+  }
+  const existing = versionsByName.get(name) ?? [];
+  versionsByName.set(name, [...new Set([...existing, ...versions])]);
+}
+
+function isCatalogSection(location: DepLocation): boolean {
+  return CATALOG_SECTIONS.has(location.section);
+}
+
+function resolvedCatalogVersions(
+  location: DepLocation,
+  index: LockfileIndex
+): string[] {
+  const range = location.declaredRange.trim();
+  const topLevel = index.topLevelResolvedVersion(location.name);
+  if (topLevel !== undefined && versionMatches(topLevel, range)) {
+    return [topLevel];
+  }
+  if (range === "" || range.includes(":") || validRange(range) === null) {
+    return topLevel === undefined ? [] : [topLevel];
+  }
+  return index
+    .resolvedVersions(location.name)
+    .filter((version) =>
+      satisfies(version, range, { includePrerelease: true })
+    );
+}
+
+function resolvedDependencyVersions(
+  cwd: string,
+  location: DepLocation,
+  index?: LockfileIndex
+): string[] {
+  const installed = readInstalledVersion(cwd, location.name);
+  if (installed !== undefined) {
+    return [installed];
+  }
+  const topLevel = index?.topLevelResolvedVersion(location.name);
+  if (topLevel !== undefined) {
+    return [topLevel];
+  }
+  return [];
+}
+
+export function computeResolvedVersions(
+  cwd: string,
+  locations: DepLocation[]
+): ResolvedVersions {
+  const loaded = loadLockfileIndex(cwd);
+  const versionsByName: ResolvedVersions = new Map();
+  for (const location of locations) {
+    if (isCatalogSection(location)) {
+      if (loaded !== undefined) {
+        mergeVersion(
+          versionsByName,
+          location.name,
+          resolvedCatalogVersions(location, loaded.index)
+        );
+      }
+      continue;
+    }
+    mergeVersion(
+      versionsByName,
+      location.name,
+      resolvedDependencyVersions(cwd, location, loaded?.index)
+    );
+  }
+  return versionsByName;
+}
+
 export function computeAnnotations(
   cwd: string,
   locations: DepLocation[]
@@ -162,7 +241,7 @@ export function computeAnnotations(
   for (const location of locations) {
     const installed = readInstalledVersion(cwd, location.name);
 
-    if (CATALOG_SECTIONS.has(location.section)) {
+    if (isCatalogSection(location)) {
       if (loaded === undefined) {
         continue;
       }

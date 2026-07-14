@@ -1,3 +1,4 @@
+import { satisfies, validRange } from "semver";
 import { maxSeverity } from "./bun/audit";
 import type {
   Advisory,
@@ -13,7 +14,8 @@ export function buildStatuses(
   depNames: string[],
   outdated: OutdatedEntry[],
   audit: AuditMap,
-  severityThreshold: Severity
+  severityThreshold: Severity,
+  resolvedVersions = new Map<string, string[]>()
 ): Map<string, DepStatus> {
   const outdatedByName = new Map(outdated.map((entry) => [entry.name, entry]));
   const statuses = new Map<string, DepStatus>();
@@ -24,13 +26,42 @@ export function buildStatuses(
       computeStatus(
         name,
         outdatedByName.get(name),
-        audit[name] ?? [],
+        filterAdvisoriesForVersions(
+          audit[name] ?? [],
+          resolvedVersions.get(name)
+        ),
         severityThreshold
       )
     );
   }
 
   return statuses;
+}
+
+function filterAdvisoriesForVersions(
+  advisories: Advisory[],
+  versions: string[] | undefined
+): Advisory[] {
+  if (versions === undefined || versions.length === 0) {
+    return advisories;
+  }
+  return advisories.filter((advisory) =>
+    advisoryMatchesAnyVersion(advisory, versions)
+  );
+}
+
+function advisoryMatchesAnyVersion(
+  advisory: Advisory,
+  versions: string[]
+): boolean {
+  const range = advisory.vulnerableVersions.trim();
+  if (range === "" || validRange(range) === null) {
+    // Preserve Bun's result when the advisory does not carry a parseable range.
+    return true;
+  }
+  return versions.some((version) =>
+    satisfies(version, range, { includePrerelease: true })
+  );
 }
 
 function computeStatus(

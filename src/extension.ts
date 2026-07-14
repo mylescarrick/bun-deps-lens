@@ -212,7 +212,7 @@ async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
   );
 
   try {
-    const statuses = await analyze(cwd, depNames, severityThreshold);
+    const statuses = await analyze(cwd, locations, severityThreshold);
     analysisCache.set(doc.uri.toString(), statuses);
     const outdated = [...statuses.values()].filter((s) => s.outdated).length;
     const vulnerable = [...statuses.values()].filter(

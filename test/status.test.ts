@@ -66,6 +66,58 @@ describe("buildStatuses", () => {
     expect(tooltip).toContain("Command Injection");
     expect(tooltip).toContain("Bun Deps");
   });
+
+  test("does not mark a safe resolved version vulnerable by package name alone", () => {
+    const wsAudit = parseAudit(
+      JSON.stringify({
+        ws: [
+          {
+            id: 1,
+            severity: "high",
+            title: "ws vuln",
+            url: "",
+            vulnerable_versions: ">=8.0.0 <8.21.0",
+          },
+        ],
+      })
+    );
+    const statuses = buildStatuses(
+      ["ws"],
+      [],
+      wsAudit,
+      "high",
+      new Map([["ws", ["8.21.0"]]])
+    );
+
+    const ws = statuses.get("ws");
+    expect(ws?.color).toBe("green");
+    expect(ws?.advisories).toEqual([]);
+  });
+
+  test("marks a resolved version vulnerable when it matches the advisory range", () => {
+    const wsAudit = parseAudit(
+      JSON.stringify({
+        ws: [
+          {
+            id: 1,
+            severity: "high",
+            title: "ws vuln",
+            url: "",
+            vulnerable_versions: ">=8.0.0 <8.21.0",
+          },
+        ],
+      })
+    );
+    const statuses = buildStatuses(
+      ["ws"],
+      [],
+      wsAudit,
+      "high",
+      new Map([["ws", ["8.19.0"]]])
+    );
+
+    expect(statuses.get("ws")?.color).toBe("red");
+  });
 });
 
 describe("inlineLabel", () => {

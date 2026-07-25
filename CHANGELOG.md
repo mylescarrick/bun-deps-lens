@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.2]
+
+- Fix `bun outdated` missing catalog entries that are declared at the repo
+  root but consumed only by child workspaces (they showed as "on the latest
+  published version" even when a newer version existed). Run `bun outdated`
+  with `--filter '*'` so every workspace is checked, not just the one
+  matching the open `package.json`.
+
 ## [0.3.1]
 
 - Fix false vulnerability annotations when `bun audit` reports a package name

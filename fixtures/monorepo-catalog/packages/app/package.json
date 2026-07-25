@@ -1,7 +1,8 @@
 {
   "name": "fixture-app",
   "dependencies": {
-    "lodash": "4.17.20"
+    "@cloudflare/think": "catalog:",
+    "lodash": "4.17.2"
   },
   "devDependencies": {
     "typescript": "catalog:",

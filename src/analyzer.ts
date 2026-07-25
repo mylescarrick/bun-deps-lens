@@ -12,7 +12,11 @@ export async function analyze(
   bunPath = "bun"
 ): Promise<Map<string, DepStatus>> {
   const [outdatedResult, auditResult] = await Promise.all([
-    runBun(["outdated", "--no-progress"], cwd, bunPath),
+    // `--filter '*'` checks every workspace, not just the one at `cwd`. Without
+    // it, a catalog entry defined at the repo root but consumed only by child
+    // workspaces is invisible when the root package.json is open, so it shows
+    // up as "latest" even when a newer version exists.
+    runBun(["outdated", "--no-progress", "--filter", "*"], cwd, bunPath),
     runBun(["audit", "--json"], cwd, bunPath),
   ]);
 

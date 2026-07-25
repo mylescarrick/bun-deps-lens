@@ -2,11 +2,10 @@
 
 ## [0.3.2]
 
-- Fix `bun outdated` missing catalog entries that are declared at the repo
-  root but consumed only by child workspaces (they showed as "on the latest
-  published version" even when a newer version existed). Run `bun outdated`
-  with `--filter '*'` so every workspace is checked, not just the one
-  matching the open `package.json`.
+- Fix catalog entries in the root `package.json` showing as "on the latest
+  published version" when a newer version was actually available. This only
+  affected catalog entries used exclusively by other workspaces, not the
+  root package itself.
 
 ## [0.3.1]
 

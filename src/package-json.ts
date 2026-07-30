@@ -3,7 +3,7 @@ import type { DepLocation, DepSection } from "./types";
 const WORKSPACES_RE = /"workspaces"\s*:\s*\{/;
 const CATALOG_RE = /"catalog"\s*:\s*\{/;
 const CATALOGS_RE = /"catalogs"\s*:\s*\{/;
-const NAMED_CATALOG_RE = /"[^"]+"\s*:\s*\{/g;
+const NAMED_CATALOG_RE = /"([^"]+)"\s*:\s*\{/g;
 
 const SECTIONS: DepSection[] = [
   "dependencies",
@@ -33,7 +33,13 @@ export function findDependencyLocations(text: string): DepLocation[] {
 
     if (block.blocks !== undefined) {
       for (const nested of block.blocks) {
-        parseEntries(text, locations, "workspaces.catalogs", nested);
+        parseEntries(
+          text,
+          locations,
+          "workspaces.catalogs",
+          nested,
+          nested.name
+        );
       }
       continue;
     }
@@ -50,7 +56,8 @@ function parseEntries(
   text: string,
   locations: DepLocation[],
   section: DepSection,
-  block: { body: string; start: number }
+  block: { body: string; start: number },
+  catalogName?: string
 ): void {
   const entryRe = /"((?:[^"\\]|\\.)+)"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
   let match: RegExpExecArray | null = entryRe.exec(block.body);
@@ -63,6 +70,7 @@ function parseEntries(
     const end = toOffset(text, valueQuoteOffset + declaredRange.length + 2);
 
     locations.push({
+      catalogName,
       declaredRange,
       name,
       section,
@@ -81,7 +89,7 @@ function findSectionBlock(
 ):
   | { start: number; body: string; blocks?: undefined }
   | {
-      blocks: { start: number; body: string }[];
+      blocks: { start: number; body: string; name: string }[];
       body?: undefined;
       start?: undefined;
     }
@@ -153,7 +161,7 @@ function findCatalogBlock(
 
 function findNamedCatalogBlocks(
   text: string
-): { blocks: { start: number; body: string }[] } | null {
+): { blocks: { start: number; body: string; name: string }[] } | null {
   const wsBody = findWorkspacesBody(text);
   if (wsBody === null) {
     return null;
@@ -171,7 +179,7 @@ function findNamedCatalogBlocks(
     return null;
   }
 
-  const blocks: { start: number; body: string }[] = [];
+  const blocks: { start: number; body: string; name: string }[] = [];
   const slice = text.slice(catalogsBodyStart, catalogsBodyEnd - 1);
   let match: RegExpExecArray | null = NAMED_CATALOG_RE.exec(slice);
   while (match !== null) {
@@ -180,6 +188,7 @@ function findNamedCatalogBlocks(
     if (nestedEnd !== null) {
       blocks.push({
         body: text.slice(nestedStart, nestedEnd - 1),
+        name: match[1] as string,
         start: nestedStart,
       });
     }

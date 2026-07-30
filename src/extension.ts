@@ -7,6 +7,7 @@ import {
   isVersionAtLeast,
   MIN_BUN_VERSION,
 } from "./bun/runner";
+import { CatalogDefinitionProvider } from "./catalog-definition-provider";
 import { DepDecorator } from "./decorations";
 import { computeAnnotations } from "./installed";
 import { findDependencyLocations } from "./package-json";
@@ -30,6 +31,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(decorator, output, lockWatcher);
 
   context.subscriptions.push(
+    vscode.languages.registerDefinitionProvider(
+      { language: "json", pattern: "**/package.json" },
+      new CatalogDefinitionProvider()
+    ),
     vscode.commands.registerCommand("bunDeps.refresh", () => {
       const editor = vscode.window.activeTextEditor;
       if (editor && isPackageJson(editor.document)) {

@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { computeBumpTarget } from "./bump-target";
+import { catalogReferenceFromDeclaredRange } from "./catalog-link";
 import type { Pending } from "./installed";
 import {
   conflictInline,
@@ -49,7 +51,8 @@ export class DepDecorator implements vscode.Disposable {
     showInlineVersions: boolean,
     pending: Map<string, Pending>,
     conflicts: Map<string, HoistConflict>,
-    unusedCatalogs: Set<string>
+    unusedCatalogs: Set<string>,
+    catalogConsumerCounts: Map<string, number>
   ): void {
     const buckets = emptyBuckets();
 
@@ -60,10 +63,12 @@ export class DepDecorator implements vscode.Disposable {
         showInlineVersions,
         pending,
         conflicts,
-        unusedCatalogs
+        unusedCatalogs,
+        catalogConsumerCounts,
+        editor.document
       );
       if (rendered !== undefined) {
-        buckets[rendered.color].push(rendered.option);
+        buckets[rendered.color].push(...rendered.options);
       }
     }
 
@@ -90,7 +95,7 @@ export class DepDecorator implements vscode.Disposable {
 
 interface RenderedDecoration {
   color: DecorationColor;
-  option: vscode.DecorationOptions;
+  options: vscode.DecorationOptions[];
 }
 
 function emptyBuckets(): Record<DecorationColor, vscode.DecorationOptions[]> {
@@ -108,22 +113,34 @@ function renderLocation(
   showInlineVersions: boolean,
   pending: Map<string, Pending>,
   conflicts: Map<string, HoistConflict>,
-  unusedCatalogs: Set<string>
+  unusedCatalogs: Set<string>,
+  catalogConsumerCounts: Map<string, number>,
+  document: vscode.TextDocument
 ): RenderedDecoration | undefined {
   const range = rangeForLocation(location);
+  const anchor = annotationAnchor(document, location);
   const pendingEntry = pending.get(location.name);
   if (pendingEntry !== undefined) {
-    return pendingDecoration(location, range, pendingEntry, showInlineVersions);
+    return pendingDecoration(
+      location,
+      range,
+      anchor,
+      pendingEntry,
+      showInlineVersions
+    );
   }
   if (isCatalogLocation(location) && unusedCatalogs.has(location.name)) {
-    return unusedCatalogDecoration(location, range, showInlineVersions);
+    return unusedCatalogDecoration(location, range, anchor, showInlineVersions);
   }
   return statusDecoration(
     location,
     range,
+    anchor,
     statuses.get(location.name),
     conflicts.get(location.name),
-    showInlineVersions
+    showInlineVersions,
+    catalogConsumerCounts.get(location.name),
+    document.uri
   );
 }
 
@@ -136,16 +153,33 @@ function rangeForLocation(location: DepLocation): vscode.Range {
   );
 }
 
+// Anchors the inline annotation to the right of a trailing comma, so it reads
+// as a note about the line rather than sitting between the value and its own
+// comma (`"^0.18.12", 0.18.12 → 0.18.13` instead of `"^0.18.12" ● ..., `).
+function annotationAnchor(
+  document: vscode.TextDocument,
+  location: DepLocation
+): vscode.Position {
+  const line = document.lineAt(location.valueEndLine).text;
+  const col =
+    line.charAt(location.valueEndCol) === ","
+      ? location.valueEndCol + 1
+      : location.valueEndCol;
+  return new vscode.Position(location.valueEndLine, col);
+}
+
 function pendingDecoration(
   location: DepLocation,
   range: vscode.Range,
+  anchor: vscode.Position,
   pendingEntry: Pending,
   showInlineVersions: boolean
 ): RenderedDecoration {
   return {
     color: "amber",
-    option: decoration(
+    options: decoration(
       range,
+      anchor,
       pendingTooltip(
         location.name,
         pendingEntry.declared,
@@ -160,12 +194,14 @@ function pendingDecoration(
 function unusedCatalogDecoration(
   location: DepLocation,
   range: vscode.Range,
+  anchor: vscode.Position,
   showInlineVersions: boolean
 ): RenderedDecoration {
   return {
     color: "unused",
-    option: decoration(
+    options: decoration(
       range,
+      anchor,
       unusedCatalogTooltip(location.name, location.declaredRange),
       showInlineVersions ? UNUSED_CATALOG_INLINE : undefined,
       "unused"
@@ -176,19 +212,29 @@ function unusedCatalogDecoration(
 function statusDecoration(
   location: DepLocation,
   range: vscode.Range,
+  anchor: vscode.Position,
   status: DepStatus | undefined,
   conflict: HoistConflict | undefined,
-  showInlineVersions: boolean
+  showInlineVersions: boolean,
+  catalogConsumerCount: number | undefined,
+  documentUri: vscode.Uri
 ): RenderedDecoration | undefined {
   if (status === undefined && conflict === undefined) {
     return;
   }
   const color = status?.color ?? "amber";
-  const { inline, tooltip } = statusCopy(location, status, conflict);
+  const { inline, tooltip } = statusCopy(
+    location,
+    status,
+    conflict,
+    catalogConsumerCount,
+    documentUri
+  );
   return {
     color,
-    option: decoration(
+    options: decoration(
       range,
+      anchor,
       tooltip,
       showInlineVersions ? inline : undefined,
       color
@@ -199,7 +245,9 @@ function statusDecoration(
 function statusCopy(
   location: DepLocation,
   status: DepStatus | undefined,
-  conflict: HoistConflict | undefined
+  conflict: HoistConflict | undefined,
+  catalogConsumerCount: number | undefined,
+  documentUri: vscode.Uri
 ): { inline?: string; tooltip: string } {
   let tooltip =
     status?.tooltip ?? `$(package) **Bun Deps**\n\n**${location.name}**`;
@@ -209,29 +257,108 @@ function statusCopy(
     const note = conflictInline(conflict);
     inline = inline === undefined ? `● ${note}` : `${inline} · ${note}`;
   }
+  const catalogLink =
+    catalogConsumerCount === undefined
+      ? undefined
+      : catalogRevealLink(location, catalogConsumerCount, documentUri);
+  if (catalogLink === undefined) {
+    const bumpLink = bumpUpdateLink(location, status, documentUri);
+    if (bumpLink !== undefined) {
+      tooltip = `${tooltip}\n\n${bumpLink}`;
+    }
+  } else {
+    tooltip = `${tooltip}\n\n${catalogLink}`;
+  }
   return { inline, tooltip };
 }
 
+function commandUri(command: string, args: unknown): string {
+  return `command:${command}?${encodeURIComponent(JSON.stringify(args))}`;
+}
+
+function bumpUpdateLink(
+  location: DepLocation,
+  status: DepStatus | undefined,
+  documentUri: vscode.Uri
+): string | undefined {
+  const target = computeBumpTarget(location, status);
+  if (target === undefined) {
+    return;
+  }
+  const args = [
+    {
+      endCol: target.range.end.character,
+      endLine: target.range.end.line,
+      newValue: target.newValue,
+      startCol: target.range.start.character,
+      startLine: target.range.start.line,
+      uri: documentUri.toString(),
+    },
+  ];
+  return `[⬆ Update to ${target.newValue}](${commandUri("bunDeps.bumpToLatest", args)})`;
+}
+
+function catalogRevealLink(
+  location: DepLocation,
+  consumerCount: number,
+  documentUri: vscode.Uri
+): string | undefined {
+  const reference = catalogReferenceFromDeclaredRange(
+    location.name,
+    location.declaredRange
+  );
+  if (reference === undefined) {
+    return;
+  }
+  const args = [
+    {
+      catalogName: reference.catalogName,
+      name: reference.name,
+      uri: documentUri.toString(),
+    },
+  ];
+  const workspaces =
+    consumerCount === 1 ? "1 workspace" : `${consumerCount} workspaces`;
+  return `[Cmd+click/Ctrl+click "catalog" to upgrade (affects ${workspaces})](${commandUri("bunDeps.revealCatalogDefinition", args)})`;
+}
+
+// Splits the value's text colour from its inline annotation: the value keeps
+// its own range (so only the quoted string is coloured), while the
+// annotation is a separate zero-width decoration at `anchor` (past the
+// trailing comma, when there is one) carrying the same hover tooltip.
 function decoration(
   range: vscode.Range,
+  anchor: vscode.Position,
   tooltip: string,
   inline: string | undefined,
   color: DecorationColor
-): vscode.DecorationOptions {
+): vscode.DecorationOptions[] {
   const hover = new vscode.MarkdownString(tooltip);
   hover.supportThemeIcons = true;
+  hover.isTrusted = {
+    enabledCommands: [
+      "bunDeps.bumpToLatest",
+      "bunDeps.revealCatalogDefinition",
+    ],
+  };
 
-  const option: vscode.DecorationOptions = { hoverMessage: hover, range };
-  if (inline !== undefined) {
-    option.renderOptions = {
+  const valueOption: vscode.DecorationOptions = { hoverMessage: hover, range };
+  if (inline === undefined) {
+    return [valueOption];
+  }
+
+  const annotationOption: vscode.DecorationOptions = {
+    hoverMessage: hover,
+    range: new vscode.Range(anchor, anchor),
+    renderOptions: {
       after: {
         color: new vscode.ThemeColor(THEME_COLOR[color]),
-        contentText: `  ${inline}`,
+        contentText: ` ${inline}`,
         fontStyle: "italic",
       },
-    };
-  }
-  return option;
+    },
+  };
+  return [valueOption, annotationOption];
 }
 
 function makeType(color: DecorationColor): vscode.TextEditorDecorationType {

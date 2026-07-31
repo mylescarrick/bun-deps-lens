@@ -45,6 +45,9 @@ export interface HoistConflict {
 }
 
 export interface DepLocation {
+  /** The enclosing named catalog (workspaces.catalogs.<name>). Undefined for
+   * the default catalog (workspaces.catalog) and for non-catalog sections. */
+  catalogName?: string;
   declaredRange: string;
   name: string;
   section: DepSection;

@@ -83,4 +83,16 @@ describe("findDependencyLocations", () => {
     expect(webpack).toBeDefined();
     expect(webpack?.declaredRange).toBe("5.88.2");
   });
+
+  test("stamps catalogName on named catalog entries", () => {
+    const locations = findDependencyLocations(PKG_WITH_CATALOG);
+    const webpack = locations.find((loc) => loc.name === "webpack");
+    expect(webpack?.catalogName).toBe("build");
+  });
+
+  test("leaves catalogName undefined for the default catalog", () => {
+    const locations = findDependencyLocations(PKG_WITH_CATALOG);
+    const eslint = locations.find((loc) => loc.name === "eslint");
+    expect(eslint?.catalogName).toBeUndefined();
+  });
 });

@@ -1,8 +1,12 @@
 # Bun Deps
 
-A Bun-only VS Code extension that annotates `package.json` with inline,
-colour-coded dependency status, powered entirely by the `bun` CLI already on
-your `PATH` — no bundled network client.
+A Bun-focused VS Code extension for managing package dependencies - even in 
+workspaces/monorepos (with catalog deps). Bun Deps annotates `package.json`
+with inline, colour-coded dependency status — and lets you act on it without 
+leaving the file — powered entirely by the `bun` CLI already on your `PATH`. 
+No bundled network client. Respects your `bunfig.toml` `minimumReleaseAge`.
+
+## Status at a glance
 
 The version string itself is coloured, and outdated/vulnerable dependencies get
 a short inline status message after the line:
@@ -14,23 +18,57 @@ a short inline status message after the line:
   (`bun audit`), regardless of how out of date it is: `● <severity> vuln ·
   current → latest`.
 
-Two extra behaviours:
+The annotation sits after the trailing comma (if there is one), so it reads as
+a note on the whole line rather than crowding the value: `"linkedom":
+"^0.18.12", 0.18.12 → 0.18.13,`. Hover either the coloured value or the
+annotation for a tooltip (headed **Bun Deps**, to distinguish it from VS
+Code's built-in package.json hover) with the version transition and advisory
+details.
+
+## Update in place
+
+Since 0.4.0, outdated dependencies aren't just labelled — they're one action away from fixed, in three equivalent ways:
+
+- **Quick fix** — put the cursor on the line and press <kbd>⌘.</kbd> /
+  <kbd>Ctrl+.</kbd> for "Update `<name>` to `<version>`".
+- **Hover link** — click "⬆ Update to `<version>`" inside the tooltip.
+- **Inlay hint** — click the small "↑ update" that appears after the
+  annotation.
+
+All three apply the identical edit: the declared range is rewritten to the
+latest published version, keeping whatever qualifier you wrote (`^`, `~`, `=`,
+or none) — `^0.18.12` becomes `^0.18.13`. Compound or partial ranges
+(`^1 || ^2`, `>=1.2.3`, `^1.2`) and non-semver specifiers (`catalog:`,
+`workspace:`, git/file URLs, `*`, `latest`) are left alone rather than guessed
+at. Nothing runs `bun i` for you — the existing pending-install hint (below)
+picks up the change once you install.
+
+## Monorepo catalogs
+
+- **Go to catalog definition** — <kbd>⌘-click</kbd> (or <kbd>Ctrl-click</kbd>,
+  or F12) the word `catalog` in a consumer entry (`"react": "catalog:"`,
+  `"esbuild": "catalog:build"`) to jump straight to its declaration in the
+  root `package.json`, even from a nested workspace package. Works with both
+  the default catalog and named catalogs (`workspaces.catalogs.<name>`).
+- **Catalog-aware update guidance** — catalog-backed lines don't get an
+  update-in-place action, since bumping them would change the version for
+  every workspace that consumes them. Instead the tooltip reports how many
+  workspaces are affected and links straight to the catalog definition, e.g.
+  *"Cmd+click/Ctrl+click 'catalog' to upgrade (affects 4 workspaces)"*.
+- **Catalog-aware hints** — `workspaces.catalog` and named catalog entries are
+  checked against `bun.lock` (not the hoisted `node_modules` copy), so unused
+  catalog entries are shown as `○ unused catalog entry` instead of a false
+  install nag. If a workspace pins a different version directly and that copy
+  is hoisted to the root, the inline note names the workspace responsible,
+  e.g. `⚠ hoisted 4.20251125.0 via packages/tools`.
+
+## Other behaviours
 
 - **Live updates** — annotations refresh as you edit `package.json`, not just on
   save.
 - **Pending-install hint** — if you change a version range to something that
   isn't installed yet, the value turns amber with `● run bun i to apply`. It
   clears automatically once you run `bun i`.
-- **Catalog-aware monorepo hints** — `workspaces.catalog` and named catalog
-  entries are checked against `bun.lock` (not the hoisted `node_modules` copy),
-  so unused catalog entries are shown as `○ unused catalog entry` instead of a
-  false install nag. If a workspace pins a different version directly and that
-  copy is hoisted to the root, the inline note names the workspace responsible,
-  e.g. `⚠ hoisted 4.20251125.0 via packages/tools`.
-
-Hover any dependency for a tooltip (headed **Bun Deps**, to distinguish it from
-VS Code's built-in package.json hover) with the version transition and advisory
-details.
 
 ## Install
 
@@ -107,13 +145,10 @@ install completes.
 
 ## Roadmap
 
-- **v1.1** — `bunfig.toml` `minimumReleaseAge` cooldown awareness + tooltips,
-  gutter dots.
-- **v1.2** — monorepo / workspace support: default and named catalogs
-  (`workspaces.catalog` and `workspaces.catalogs`), workspace-column `bun
-  outdated` parsing, and lockfile-aware pending-install hints for
-  platform-skipped packages.
-- **v2** — quick-fix version bumps and a status-bar summary.
+- We've shipped pretty much all I can think of - feel free to post any issues.
+- **v1** — when it's been stable for a couple of months I'll tag it `1.0`.
+- **v2** — a status-bar summary, and bulk "update all outdated" across a
+  `package.json`.
 
 ## License
 

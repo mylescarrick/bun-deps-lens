@@ -6,6 +6,7 @@ import {
   type LockfileIndex,
   loadLockfileIndex,
 } from "./bun/lockfile";
+import { catalogReferenceFromDeclaredRange } from "./catalog-link";
 import type { DepLocation, HoistConflict } from "./types";
 
 const CATALOG_SECTIONS = new Set<string>([
@@ -19,6 +20,10 @@ export interface Pending {
 }
 
 export interface Annotations {
+  /** Number of workspaces consuming each catalog-backed dependency via
+   * `catalog:`/`catalog:<name>`, keyed by package name. Only populated for
+   * consumer-side entries, not the catalog definitions themselves. */
+  catalogConsumerCounts: Map<string, number>;
   conflicts: Map<string, HoistConflict>;
   pending: Map<string, Pending>;
   unusedCatalogs: Set<string>;
@@ -237,9 +242,24 @@ export function computeAnnotations(
   const pending = new Map<string, Pending>();
   const conflicts = new Map<string, HoistConflict>();
   const unusedCatalogs = new Set<string>();
+  const catalogConsumerCounts = new Map<string, number>();
 
   for (const location of locations) {
     const installed = readInstalledVersion(cwd, location.name);
+
+    if (
+      loaded !== undefined &&
+      !isCatalogSection(location) &&
+      catalogReferenceFromDeclaredRange(
+        location.name,
+        location.declaredRange
+      ) !== undefined
+    ) {
+      catalogConsumerCounts.set(
+        location.name,
+        loaded.index.catalogConsumers(location.name).length
+      );
+    }
 
     if (isCatalogSection(location)) {
       if (loaded === undefined) {
@@ -274,5 +294,5 @@ export function computeAnnotations(
     }
   }
 
-  return { conflicts, pending, unusedCatalogs };
+  return { catalogConsumerCounts, conflicts, pending, unusedCatalogs };
 }

@@ -1,9 +1,10 @@
 # Bun Deps
 
-A Bun-only VS Code extension that annotates `package.json` with inline,
-colour-coded dependency status — and lets you act on it without leaving the
-file — powered entirely by the `bun` CLI already on your `PATH`. No bundled
-network client.
+A Bun-focused VS Code extension for managing package dependencies - even in 
+workspaces/monorepos (with catalog deps). Bun Deps annotates `package.json`
+with inline, colour-coded dependency status — and lets you act on it without 
+leaving the file — powered entirely by the `bun` CLI already on your `PATH`. 
+No bundled network client. Respects your `bunfig.toml` `minimumReleaseAge`.
 
 ## Status at a glance
 
@@ -26,8 +27,7 @@ details.
 
 ## Update in place
 
-Outdated dependencies aren't just labelled — they're one action away from
-fixed, in three equivalent ways:
+Since 0.4.0, outdated dependencies aren't just labelled — they're one action away from fixed, in three equivalent ways:
 
 - **Quick fix** — put the cursor on the line and press <kbd>⌘.</kbd> /
   <kbd>Ctrl+.</kbd> for "Update `<name>` to `<version>`".
@@ -145,12 +145,8 @@ install completes.
 
 ## Roadmap
 
-- **v1.1** — `bunfig.toml` `minimumReleaseAge` cooldown awareness + tooltips,
-  gutter dots.
-- **v1.2** — monorepo / workspace support: default and named catalogs
-  (`workspaces.catalog` and `workspaces.catalogs`), workspace-column `bun
-  outdated` parsing, and lockfile-aware pending-install hints for
-  platform-skipped packages.
+- We've shipped pretty much all I can think of - feel free to post any issues.
+- **v1** — when it's been stable for a couple of months I'll tag it `1.0`.
 - **v2** — a status-bar summary, and bulk "update all outdated" across a
   `package.json`.
 

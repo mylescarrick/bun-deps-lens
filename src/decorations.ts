@@ -65,10 +65,10 @@ export class DepDecorator implements vscode.Disposable {
         conflicts,
         unusedCatalogs,
         catalogConsumerCounts,
-        editor.document.uri
+        editor.document
       );
       if (rendered !== undefined) {
-        buckets[rendered.color].push(rendered.option);
+        buckets[rendered.color].push(...rendered.options);
       }
     }
 
@@ -95,7 +95,7 @@ export class DepDecorator implements vscode.Disposable {
 
 interface RenderedDecoration {
   color: DecorationColor;
-  option: vscode.DecorationOptions;
+  options: vscode.DecorationOptions[];
 }
 
 function emptyBuckets(): Record<DecorationColor, vscode.DecorationOptions[]> {
@@ -115,24 +115,32 @@ function renderLocation(
   conflicts: Map<string, HoistConflict>,
   unusedCatalogs: Set<string>,
   catalogConsumerCounts: Map<string, number>,
-  documentUri: vscode.Uri
+  document: vscode.TextDocument
 ): RenderedDecoration | undefined {
   const range = rangeForLocation(location);
+  const anchor = annotationAnchor(document, location);
   const pendingEntry = pending.get(location.name);
   if (pendingEntry !== undefined) {
-    return pendingDecoration(location, range, pendingEntry, showInlineVersions);
+    return pendingDecoration(
+      location,
+      range,
+      anchor,
+      pendingEntry,
+      showInlineVersions
+    );
   }
   if (isCatalogLocation(location) && unusedCatalogs.has(location.name)) {
-    return unusedCatalogDecoration(location, range, showInlineVersions);
+    return unusedCatalogDecoration(location, range, anchor, showInlineVersions);
   }
   return statusDecoration(
     location,
     range,
+    anchor,
     statuses.get(location.name),
     conflicts.get(location.name),
     showInlineVersions,
     catalogConsumerCounts.get(location.name),
-    documentUri
+    document.uri
   );
 }
 
@@ -145,16 +153,33 @@ function rangeForLocation(location: DepLocation): vscode.Range {
   );
 }
 
+// Anchors the inline annotation to the right of a trailing comma, so it reads
+// as a note about the line rather than sitting between the value and its own
+// comma (`"^0.18.12", 0.18.12 → 0.18.13` instead of `"^0.18.12" ● ..., `).
+function annotationAnchor(
+  document: vscode.TextDocument,
+  location: DepLocation
+): vscode.Position {
+  const line = document.lineAt(location.valueEndLine).text;
+  const col =
+    line.charAt(location.valueEndCol) === ","
+      ? location.valueEndCol + 1
+      : location.valueEndCol;
+  return new vscode.Position(location.valueEndLine, col);
+}
+
 function pendingDecoration(
   location: DepLocation,
   range: vscode.Range,
+  anchor: vscode.Position,
   pendingEntry: Pending,
   showInlineVersions: boolean
 ): RenderedDecoration {
   return {
     color: "amber",
-    option: decoration(
+    options: decoration(
       range,
+      anchor,
       pendingTooltip(
         location.name,
         pendingEntry.declared,
@@ -169,12 +194,14 @@ function pendingDecoration(
 function unusedCatalogDecoration(
   location: DepLocation,
   range: vscode.Range,
+  anchor: vscode.Position,
   showInlineVersions: boolean
 ): RenderedDecoration {
   return {
     color: "unused",
-    option: decoration(
+    options: decoration(
       range,
+      anchor,
       unusedCatalogTooltip(location.name, location.declaredRange),
       showInlineVersions ? UNUSED_CATALOG_INLINE : undefined,
       "unused"
@@ -185,6 +212,7 @@ function unusedCatalogDecoration(
 function statusDecoration(
   location: DepLocation,
   range: vscode.Range,
+  anchor: vscode.Position,
   status: DepStatus | undefined,
   conflict: HoistConflict | undefined,
   showInlineVersions: boolean,
@@ -204,8 +232,9 @@ function statusDecoration(
   );
   return {
     color,
-    option: decoration(
+    options: decoration(
       range,
+      anchor,
       tooltip,
       showInlineVersions ? inline : undefined,
       color
@@ -293,12 +322,17 @@ function catalogRevealLink(
   return `[Cmd+click/Ctrl+click "catalog" to upgrade (affects ${workspaces})](${commandUri("bunDeps.revealCatalogDefinition", args)})`;
 }
 
+// Splits the value's text colour from its inline annotation: the value keeps
+// its own range (so only the quoted string is coloured), while the
+// annotation is a separate zero-width decoration at `anchor` (past the
+// trailing comma, when there is one) carrying the same hover tooltip.
 function decoration(
   range: vscode.Range,
+  anchor: vscode.Position,
   tooltip: string,
   inline: string | undefined,
   color: DecorationColor
-): vscode.DecorationOptions {
+): vscode.DecorationOptions[] {
   const hover = new vscode.MarkdownString(tooltip);
   hover.supportThemeIcons = true;
   hover.isTrusted = {
@@ -308,17 +342,23 @@ function decoration(
     ],
   };
 
-  const option: vscode.DecorationOptions = { hoverMessage: hover, range };
-  if (inline !== undefined) {
-    option.renderOptions = {
+  const valueOption: vscode.DecorationOptions = { hoverMessage: hover, range };
+  if (inline === undefined) {
+    return [valueOption];
+  }
+
+  const annotationOption: vscode.DecorationOptions = {
+    hoverMessage: hover,
+    range: new vscode.Range(anchor, anchor),
+    renderOptions: {
       after: {
         color: new vscode.ThemeColor(THEME_COLOR[color]),
-        contentText: `  ${inline}`,
+        contentText: ` ${inline}`,
         fontStyle: "italic",
       },
-    };
-  }
-  return option;
+    },
+  };
+  return [valueOption, annotationOption];
 }
 
 function makeType(color: DecorationColor): vscode.TextEditorDecorationType {

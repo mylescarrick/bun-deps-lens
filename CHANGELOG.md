@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0]
+
+- Go to catalog definition: Cmd+click/Ctrl+click (or F12) the word `catalog`
+  in a consumer entry (`"react": "catalog:"`, `"esbuild": "catalog:build"`)
+  to jump to its declaration in the root `package.json`, from any workspace.
+  Works with the default catalog and named catalogs.
+- Update a dependency to the latest version in place, via a quick fix
+  (<kbd>⌘.</kbd>), a hover link, or an inlay hint after the annotation. The
+  rewrite keeps whatever qualifier you wrote (`^`, `~`, `=`, or none) and
+  always raises the declared floor to match the latest published version,
+  even when the old range would already have admitted it.
+- Catalog-backed lines get update guidance instead of an update action, since
+  bumping a catalog entry changes every consuming workspace: the tooltip now
+  reports how many workspaces are affected and links to the catalog
+  definition.
+- Anchor the inline annotation after the trailing comma, when there is one, so
+  it reads as a note on the whole line instead of sitting between the value
+  and its own comma.
+
 ## [0.3.2]
 
 - Fix catalog entries in the root `package.json` showing as "on the latest

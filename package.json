@@ -22,9 +22,9 @@
     "publish": "vsce publish --no-dependencies",
     "vscode:prepublish": "bun run build"
   },
-  "version": "0.3.2",
+  "version": "0.4.0",
   "displayName": "Bun Deps",
-  "description": "Inline colour-coded dependency status for package.json, powered by Bun's outdated & audit CLIs.",
+  "description": "Inline colour-coded dependency status for package.json, with one-click updates and catalog navigation — powered by Bun's outdated & audit CLIs.",
   "publisher": "myles-carrick",
   "license": "MIT",
   "repository": {
@@ -47,7 +47,10 @@
     "dependencies",
     "package.json",
     "outdated",
-    "audit"
+    "audit",
+    "monorepo",
+    "catalog",
+    "workspaces"
   ],
   "icon": "media/icon.png",
   "pricing": "Free",

@@ -1,52 +1,50 @@
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import * as vscode from "vscode";
 import { loadLockfileIndex } from "./bun/lockfile";
-import { findCatalogDefinition, findCatalogReference } from "./catalog-link";
+import {
+  type CatalogReference,
+  findCatalogDefinition,
+  findCatalogReference,
+} from "./catalog-link";
 import { findDependencyLocations } from "./package-json";
 import type { DepLocation } from "./types";
 
 export class CatalogDefinitionProvider implements vscode.DefinitionProvider {
-  provideDefinition(
+  async provideDefinition(
     document: vscode.TextDocument,
     position: vscode.Position
-  ): vscode.Location | undefined {
-    const locations = findDependencyLocations(document.getText());
-    const reference = findCatalogReference(locations, {
-      character: position.character,
-      line: position.line,
-    });
+  ): Promise<vscode.Location | undefined> {
+    const reference = findCatalogReference(
+      findDependencyLocations(document.getText()),
+      { character: position.character, line: position.line }
+    );
     if (reference === undefined) {
       return;
     }
-
-    const root = loadLockfileIndex(dirname(document.uri.fsPath))?.root;
-    if (root === undefined) {
-      return;
-    }
-    const rootPath = join(root, "package.json");
-
-    const rootLocations =
-      rootPath === document.uri.fsPath
-        ? locations
-        : findDependencyLocations(readRootPackageJson(rootPath));
-    const definition = findCatalogDefinition(rootLocations, reference);
-    if (definition === undefined) {
-      return;
-    }
-
-    return new vscode.Location(
-      vscode.Uri.file(rootPath),
-      rangeForLocation(definition)
-    );
+    return await resolveCatalogDefinition(document.uri.fsPath, reference);
   }
 }
 
-function readRootPackageJson(path: string): string {
-  const open = vscode.workspace.textDocuments.find(
-    (doc) => doc.uri.fsPath === path
+// Resolves a catalog reference to its declaration in the workspace root,
+// wherever the reference was found. Prefers an already-open buffer over disk
+// so unsaved catalog edits resolve correctly.
+export async function resolveCatalogDefinition(
+  sourceFsPath: string,
+  reference: CatalogReference
+): Promise<vscode.Location | undefined> {
+  const root = loadLockfileIndex(dirname(sourceFsPath))?.root;
+  if (root === undefined) {
+    return;
+  }
+  const rootUri = vscode.Uri.file(join(root, "package.json"));
+  const rootDoc = await vscode.workspace.openTextDocument(rootUri);
+  const definition = findCatalogDefinition(
+    findDependencyLocations(rootDoc.getText()),
+    reference
   );
-  return open === undefined ? readFileSync(path, "utf8") : open.getText();
+  return definition === undefined
+    ? undefined
+    : new vscode.Location(rootUri, rangeForLocation(definition));
 }
 
 function rangeForLocation(location: DepLocation): vscode.Range {

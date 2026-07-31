@@ -1,6 +1,9 @@
 import { dirname } from "node:path";
 import * as vscode from "vscode";
 import { analyze } from "./analyzer";
+import { BumpCodeActionProvider } from "./bump-code-action-provider";
+import { bumpToLatest } from "./bump-command";
+import { BumpInlayHintsProvider } from "./bump-inlay-hints-provider";
 import {
   BunNotFoundError,
   getBunVersion,
@@ -11,6 +14,7 @@ import { CatalogDefinitionProvider } from "./catalog-definition-provider";
 import { DepDecorator } from "./decorations";
 import { computeAnnotations } from "./installed";
 import { findDependencyLocations } from "./package-json";
+import { revealCatalogDefinition } from "./reveal-catalog-definition-command";
 import type { DepStatus, Severity } from "./types";
 
 const ANALYSIS_DEBOUNCE_MS = 600;
@@ -30,10 +34,29 @@ export function activate(context: vscode.ExtensionContext): void {
   const lockWatcher = vscode.workspace.createFileSystemWatcher("**/bun.lock*");
   context.subscriptions.push(decorator, output, lockWatcher);
 
+  const packageJsonSelector: vscode.DocumentFilter = {
+    language: "json",
+    pattern: "**/package.json",
+  };
   context.subscriptions.push(
     vscode.languages.registerDefinitionProvider(
-      { language: "json", pattern: "**/package.json" },
+      packageJsonSelector,
       new CatalogDefinitionProvider()
+    ),
+    vscode.languages.registerCodeActionsProvider(
+      packageJsonSelector,
+      new BumpCodeActionProvider(getCachedStatuses),
+      { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] }
+    ),
+    vscode.languages.registerInlayHintsProvider(
+      packageJsonSelector,
+      new BumpInlayHintsProvider(getCachedStatuses)
+    ),
+    vscode.commands.registerCommand("bunDeps.bumpToLatest", (args) =>
+      bumpToLatest(args).catch(reportError)
+    ),
+    vscode.commands.registerCommand("bunDeps.revealCatalogDefinition", (args) =>
+      revealCatalogDefinition(args).catch(reportError)
     ),
     vscode.commands.registerCommand("bunDeps.refresh", () => {
       const editor = vscode.window.activeTextEditor;
@@ -85,6 +108,10 @@ export function deactivate(): void {
 
 function config(): vscode.WorkspaceConfiguration {
   return vscode.workspace.getConfiguration("bunDeps");
+}
+
+function getCachedStatuses(uri: string): Map<string, DepStatus> | undefined {
+  return analysisCache.get(uri);
 }
 
 function isPackageJson(doc: vscode.TextDocument): boolean {
@@ -167,10 +194,8 @@ function renderEditor(editor: vscode.TextEditor): void {
   }
 
   const statuses = analysisCache.get(doc.uri.toString()) ?? new Map();
-  const { pending, conflicts, unusedCatalogs } = computeAnnotations(
-    dirname(doc.uri.fsPath),
-    locations
-  );
+  const { pending, conflicts, unusedCatalogs, catalogConsumerCounts } =
+    computeAnnotations(dirname(doc.uri.fsPath), locations);
   if (doc.isClosed) {
     return;
   }
@@ -184,7 +209,8 @@ function renderEditor(editor: vscode.TextEditor): void {
     cfg.get<boolean>("showInlineVersions", true),
     pending,
     conflicts,
-    unusedCatalogs
+    unusedCatalogs,
+    catalogConsumerCounts
   );
 }
 

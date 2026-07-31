@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { computeBumpTarget } from "./bump-target";
+import { catalogReferenceFromDeclaredRange } from "./catalog-link";
 import type { Pending } from "./installed";
 import {
   conflictInline,
@@ -49,7 +51,8 @@ export class DepDecorator implements vscode.Disposable {
     showInlineVersions: boolean,
     pending: Map<string, Pending>,
     conflicts: Map<string, HoistConflict>,
-    unusedCatalogs: Set<string>
+    unusedCatalogs: Set<string>,
+    catalogConsumerCounts: Map<string, number>
   ): void {
     const buckets = emptyBuckets();
 
@@ -60,7 +63,9 @@ export class DepDecorator implements vscode.Disposable {
         showInlineVersions,
         pending,
         conflicts,
-        unusedCatalogs
+        unusedCatalogs,
+        catalogConsumerCounts,
+        editor.document.uri
       );
       if (rendered !== undefined) {
         buckets[rendered.color].push(rendered.option);
@@ -108,7 +113,9 @@ function renderLocation(
   showInlineVersions: boolean,
   pending: Map<string, Pending>,
   conflicts: Map<string, HoistConflict>,
-  unusedCatalogs: Set<string>
+  unusedCatalogs: Set<string>,
+  catalogConsumerCounts: Map<string, number>,
+  documentUri: vscode.Uri
 ): RenderedDecoration | undefined {
   const range = rangeForLocation(location);
   const pendingEntry = pending.get(location.name);
@@ -123,7 +130,9 @@ function renderLocation(
     range,
     statuses.get(location.name),
     conflicts.get(location.name),
-    showInlineVersions
+    showInlineVersions,
+    catalogConsumerCounts.get(location.name),
+    documentUri
   );
 }
 
@@ -178,13 +187,21 @@ function statusDecoration(
   range: vscode.Range,
   status: DepStatus | undefined,
   conflict: HoistConflict | undefined,
-  showInlineVersions: boolean
+  showInlineVersions: boolean,
+  catalogConsumerCount: number | undefined,
+  documentUri: vscode.Uri
 ): RenderedDecoration | undefined {
   if (status === undefined && conflict === undefined) {
     return;
   }
   const color = status?.color ?? "amber";
-  const { inline, tooltip } = statusCopy(location, status, conflict);
+  const { inline, tooltip } = statusCopy(
+    location,
+    status,
+    conflict,
+    catalogConsumerCount,
+    documentUri
+  );
   return {
     color,
     option: decoration(
@@ -199,7 +216,9 @@ function statusDecoration(
 function statusCopy(
   location: DepLocation,
   status: DepStatus | undefined,
-  conflict: HoistConflict | undefined
+  conflict: HoistConflict | undefined,
+  catalogConsumerCount: number | undefined,
+  documentUri: vscode.Uri
 ): { inline?: string; tooltip: string } {
   let tooltip =
     status?.tooltip ?? `$(package) **Bun Deps**\n\n**${location.name}**`;
@@ -209,7 +228,69 @@ function statusCopy(
     const note = conflictInline(conflict);
     inline = inline === undefined ? `● ${note}` : `${inline} · ${note}`;
   }
+  const catalogLink =
+    catalogConsumerCount === undefined
+      ? undefined
+      : catalogRevealLink(location, catalogConsumerCount, documentUri);
+  if (catalogLink === undefined) {
+    const bumpLink = bumpUpdateLink(location, status, documentUri);
+    if (bumpLink !== undefined) {
+      tooltip = `${tooltip}\n\n${bumpLink}`;
+    }
+  } else {
+    tooltip = `${tooltip}\n\n${catalogLink}`;
+  }
   return { inline, tooltip };
+}
+
+function commandUri(command: string, args: unknown): string {
+  return `command:${command}?${encodeURIComponent(JSON.stringify(args))}`;
+}
+
+function bumpUpdateLink(
+  location: DepLocation,
+  status: DepStatus | undefined,
+  documentUri: vscode.Uri
+): string | undefined {
+  const target = computeBumpTarget(location, status);
+  if (target === undefined) {
+    return;
+  }
+  const args = [
+    {
+      endCol: target.range.end.character,
+      endLine: target.range.end.line,
+      newValue: target.newValue,
+      startCol: target.range.start.character,
+      startLine: target.range.start.line,
+      uri: documentUri.toString(),
+    },
+  ];
+  return `[⬆ Update to ${target.newValue}](${commandUri("bunDeps.bumpToLatest", args)})`;
+}
+
+function catalogRevealLink(
+  location: DepLocation,
+  consumerCount: number,
+  documentUri: vscode.Uri
+): string | undefined {
+  const reference = catalogReferenceFromDeclaredRange(
+    location.name,
+    location.declaredRange
+  );
+  if (reference === undefined) {
+    return;
+  }
+  const args = [
+    {
+      catalogName: reference.catalogName,
+      name: reference.name,
+      uri: documentUri.toString(),
+    },
+  ];
+  const workspaces =
+    consumerCount === 1 ? "1 workspace" : `${consumerCount} workspaces`;
+  return `[Cmd+click/Ctrl+click "catalog" to upgrade (affects ${workspaces})](${commandUri("bunDeps.revealCatalogDefinition", args)})`;
 }
 
 function decoration(
@@ -220,6 +301,12 @@ function decoration(
 ): vscode.DecorationOptions {
   const hover = new vscode.MarkdownString(tooltip);
   hover.supportThemeIcons = true;
+  hover.isTrusted = {
+    enabledCommands: [
+      "bunDeps.bumpToLatest",
+      "bunDeps.revealCatalogDefinition",
+    ],
+  };
 
   const option: vscode.DecorationOptions = { hoverMessage: hover, range };
   if (inline !== undefined) {

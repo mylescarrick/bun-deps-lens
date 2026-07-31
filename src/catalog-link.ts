@@ -41,6 +41,19 @@ function containsPosition(location: DepLocation, position: Position): boolean {
   return true;
 }
 
+// Parses a consumer value like `catalog:` or `catalog:build` into a reference,
+// or undefined if it isn't a catalog specifier at all.
+export function catalogReferenceFromDeclaredRange(
+  name: string,
+  declaredRange: string
+): CatalogReference | undefined {
+  if (!declaredRange.startsWith(CATALOG_PREFIX)) {
+    return;
+  }
+  const suffix = declaredRange.slice(CATALOG_PREFIX.length);
+  return { catalogName: suffix === "" ? undefined : suffix, name };
+}
+
 // Finds the `catalog:` (or `catalog:<name>`) reference at `position`, if any —
 // i.e. a consumer entry like `"react": "catalog:build"`, not a catalog
 // definition block itself.
@@ -54,14 +67,9 @@ export function findCatalogReference(
       loc.declaredRange.startsWith(CATALOG_PREFIX) &&
       containsPosition(loc, position)
   );
-  if (location === undefined) {
-    return;
-  }
-  const suffix = location.declaredRange.slice(CATALOG_PREFIX.length);
-  return {
-    catalogName: suffix === "" ? undefined : suffix,
-    name: location.name,
-  };
+  return location === undefined
+    ? undefined
+    : catalogReferenceFromDeclaredRange(location.name, location.declaredRange);
 }
 
 // Finds the definition of `reference` among the locations parsed from the

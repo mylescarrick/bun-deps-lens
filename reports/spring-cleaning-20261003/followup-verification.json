@@ -1,0 +1,68 @@
+{
+  "startedAt": "2026-10-04T08:07:15.872086+00:00",
+  "scope": "After all five approved Opus fixes; executed by parent, not independent reviewers",
+  "checks": [
+    {
+      "id": "frozen-install",
+      "command": "bun install --frozen-lockfile",
+      "exitCode": 0
+    },
+    {
+      "id": "typecheck",
+      "command": "bun run typecheck",
+      "exitCode": 0
+    },
+    {
+      "id": "lint",
+      "command": "bun run lint",
+      "exitCode": 0
+    },
+    {
+      "id": "unit-tests",
+      "command": "bun test",
+      "exitCode": 0
+    },
+    {
+      "id": "extension-lifecycle",
+      "command": "bun run test:extension",
+      "exitCode": 0
+    },
+    {
+      "id": "node-benchmark",
+      "command": "bash reports/spring-cleaning-20261003/benchmark.sh > reports/spring-cleaning-20261003/after-review-fixes.json",
+      "exitCode": 0
+    },
+    {
+      "id": "package",
+      "command": "bun run package",
+      "exitCode": 0
+    },
+    {
+      "id": "production-audit",
+      "command": "bun audit --production",
+      "exitCode": 0
+    },
+    {
+      "id": "diff-check",
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    {
+      "id": "package-content",
+      "exitCode": 0,
+      "files": 9,
+      "bytes": 99006,
+      "archive": "bun-deps-0.4.0.vsix",
+      "linkedSourceMap": true,
+      "developmentArtifactsExcluded": true
+    }
+  ],
+  "finishedAt": "2026-10-04T08:07:25.230046+00:00",
+  "benchmark": {
+    "path": "reports/spring-cleaning-20261003/after-review-fixes.json",
+    "parser1000MedianMs": 0.3,
+    "warmCachedEdit1000MedianMs": 1.809,
+    "zeroSyncAndAsyncIO": true
+  },
+  "detailedLogs": "Archived outside Git with the review-run artifacts; this file retains commands and recorded results"
+}

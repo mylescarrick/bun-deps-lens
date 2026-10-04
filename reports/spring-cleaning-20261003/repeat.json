@@ -1,0 +1,93 @@
+{
+  "node": "v24.18.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "results": [
+    {
+      "case": "installed-50",
+      "textBytes": 1166,
+      "parse": {
+        "medianMs": 0.079,
+        "p95Ms": 0.1,
+        "callsPerRun": {
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 0.935,
+        "p95Ms": 1.083,
+        "callsPerRun": {
+          "exists": 51,
+          "read": 50,
+          "stat": 1,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "case": "installed-500",
+      "textBytes": 11916,
+      "parse": {
+        "medianMs": 6.082,
+        "p95Ms": 6.583,
+        "callsPerRun": {
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 71.426,
+        "p95Ms": 90.593,
+        "callsPerRun": {
+          "exists": 501,
+          "read": 500,
+          "stat": 1,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "case": "installed-1000",
+      "textBytes": 23916,
+      "parse": {
+        "medianMs": 30.771,
+        "p95Ms": 32.352,
+        "callsPerRun": {
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 102.555,
+        "p95Ms": 107.582,
+        "callsPerRun": {
+          "exists": 1001,
+          "read": 1000,
+          "stat": 1,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "case": "100-missing-optionals-1MB-lock",
+      "lockBytes": 1150590,
+      "annotations": {
+        "medianMs": 43.997,
+        "p95Ms": 44.534,
+        "callsPerRun": {
+          "exists": 901,
+          "read": 100,
+          "stat": 1,
+          "lockBytes": 115059000
+        }
+      }
+    }
+  ]
+}

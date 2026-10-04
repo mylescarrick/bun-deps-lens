@@ -1,0 +1,183 @@
+{
+  "node": "v24.18.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "results": [
+    {
+      "snapshotLoadMs": 202.427,
+      "case": "installed-50",
+      "textBytes": 1166,
+      "parse": {
+        "medianMs": 0.018,
+        "p95Ms": 0.02,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 0.059,
+        "p95Ms": 0.124,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmEdit": {
+        "medianMs": 0.068,
+        "p95Ms": 0.136,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmCachedEdit": {
+        "medianMs": 0.125,
+        "p95Ms": 0.28,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "snapshotLoadMs": 765.656,
+      "case": "installed-500",
+      "textBytes": 11916,
+      "parse": {
+        "medianMs": 0.177,
+        "p95Ms": 0.21,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 0.453,
+        "p95Ms": 0.601,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmEdit": {
+        "medianMs": 0.554,
+        "p95Ms": 0.647,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmCachedEdit": {
+        "medianMs": 1.341,
+        "p95Ms": 1.661,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "snapshotLoadMs": 1220.453,
+      "case": "installed-1000",
+      "textBytes": 23916,
+      "parse": {
+        "medianMs": 0.3,
+        "p95Ms": 0.35,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 0.703,
+        "p95Ms": 0.839,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmEdit": {
+        "medianMs": 0.81,
+        "p95Ms": 0.895,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmCachedEdit": {
+        "medianMs": 1.809,
+        "p95Ms": 2.603,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "snapshotLoadMs": 32.275,
+      "case": "100-missing-optionals-1MB-lock",
+      "lockBytes": 1150590,
+      "annotations": {
+        "medianMs": 1.753,
+        "p95Ms": 1.779,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "asyncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      }
+    }
+  ]
+}

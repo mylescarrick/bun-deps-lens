@@ -102,7 +102,8 @@ Run **Bun Deps: Refresh** from the command palette to re-analyse on demand.
 ```sh
 bun install
 bun run build        # bundle with `bun build` (CommonJS, vscode external)
-bun test             # unit tests for parsers & status logic (bun:test)
+bun test             # unit tests for parsers, snapshots & status logic
+bun run test:extension # Node lifecycle test with editor/process adapters
 bun run typecheck    # tsc --noEmit
 bun run lint         # ultracite (Biome) check
 ```
@@ -135,13 +136,24 @@ output, and renders decorations:
   copy of the same package name is vulnerable.
 
 The registry analysis runs on save, on a background interval, and via the
-refresh command. Editing re-renders instantly from cached data — the
-pending-install hint is computed locally, with no network call. Standard
-package ranges are compared against the installed version in `node_modules`
-(via `semver`); catalog declarations are resolved from an in-process,
-mtime-cached `bun.lock` index so hoisted workspace copies do not create false
-"run `bun i`" hints. A watcher on `bun.lock` triggers a fresh analysis once an
-install completes.
+refresh command. Editing re-renders from cached data with no network call or
+synchronous filesystem access. Dependency locations are parsed once per document
+version and shared by decorations, quick fixes, inlay hints and catalog navigation.
+
+Installed manifests and the nearest `bun.lock` index are loaded asynchronously
+into a snapshot per package directory, preserving workspace-local overrides.
+Standard package ranges are compared against those installed versions via `semver`;
+catalog declarations use the lockfile index so hoisted copies do not create false
+"run `bun i`" hints. Platform-skipped dependencies reuse the cached lockfile text
+instead of rereading it for each dependency. Newly typed package names stay
+unclassified until their asynchronous install check completes.
+
+Snapshots refresh on analysis and explicit Refresh, on lockfile creation/change/
+deletion, and asynchronously every **30 seconds** while a dependency-bearing
+`package.json` is visible. This local revalidation detects installs that do not
+rewrite the lockfile and still runs when registry background refresh is set to 0.
+It does not make registry requests. Unchanged lockfile indexes are reused, and
+closing documents or removing workspaces releases their cached data.
 
 ## Roadmap
 

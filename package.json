@@ -37,6 +37,7 @@
     "publish": "vsce publish --no-dependencies",
     "setup:fixtures": "for d in fixtures/monorepo-catalog fixtures/simple-single; do (cd \"$d\" && bun install); done",
     "test": "bun test",
+    "test:extension": "bash test/extension-lifecycle.sh",
     "typecheck": "tsc --noEmit",
     "vscode:prepublish": "bun run build",
     "watch": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked --watch"

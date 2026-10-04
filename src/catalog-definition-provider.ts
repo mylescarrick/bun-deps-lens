@@ -1,12 +1,12 @@
 import { dirname, join } from "node:path";
 import * as vscode from "vscode";
-import { loadLockfileIndex } from "./bun/lockfile";
+import { findLockfile } from "./bun/lockfile";
 import {
   type CatalogReference,
   findCatalogDefinition,
   findCatalogReference,
 } from "./catalog-link";
-import { findDependencyLocations } from "./package-json";
+import { dependencyLocations } from "./document-locations";
 import type { DepLocation } from "./types";
 
 export class CatalogDefinitionProvider implements vscode.DefinitionProvider {
@@ -14,10 +14,10 @@ export class CatalogDefinitionProvider implements vscode.DefinitionProvider {
     document: vscode.TextDocument,
     position: vscode.Position
   ): Promise<vscode.Location | undefined> {
-    const reference = findCatalogReference(
-      findDependencyLocations(document.getText()),
-      { character: position.character, line: position.line }
-    );
+    const reference = findCatalogReference(dependencyLocations.get(document), {
+      character: position.character,
+      line: position.line,
+    });
     if (reference === undefined) {
       return;
     }
@@ -32,14 +32,14 @@ export async function resolveCatalogDefinition(
   sourceFsPath: string,
   reference: CatalogReference
 ): Promise<vscode.Location | undefined> {
-  const root = loadLockfileIndex(dirname(sourceFsPath))?.root;
-  if (root === undefined) {
+  const lockfile = await findLockfile(dirname(sourceFsPath));
+  if (lockfile === null || lockfile.endsWith(".lockb")) {
     return;
   }
-  const rootUri = vscode.Uri.file(join(root, "package.json"));
+  const rootUri = vscode.Uri.file(join(dirname(lockfile), "package.json"));
   const rootDoc = await vscode.workspace.openTextDocument(rootUri);
   const definition = findCatalogDefinition(
-    findDependencyLocations(rootDoc.getText()),
+    dependencyLocations.get(rootDoc),
     reference
   );
   return definition === undefined

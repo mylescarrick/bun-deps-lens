@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import * as vscode from "vscode";
 import { analyze } from "./analyzer";
 import { BumpCodeActionProvider } from "./bump-code-action-provider";
@@ -12,13 +12,19 @@ import {
 } from "./bun/runner";
 import { CatalogDefinitionProvider } from "./catalog-definition-provider";
 import { DepDecorator } from "./decorations";
+import { dependencyLocations } from "./document-locations";
 import { computeAnnotations } from "./installed";
-import { findDependencyLocations } from "./package-json";
+import {
+  type InstalledSnapshot,
+  InstalledSnapshotCache,
+} from "./installed-snapshot";
 import { revealCatalogDefinition } from "./reveal-catalog-definition-command";
 import type { DepStatus, Severity } from "./types";
 
 const ANALYSIS_DEBOUNCE_MS = 600;
 const RENDER_DEBOUNCE_MS = 200;
+const INSTALLED_REFRESH_MS = 30_000;
+const installedSnapshots = new InstalledSnapshotCache();
 
 let decorator: DepDecorator;
 let output: vscode.OutputChannel;
@@ -26,6 +32,7 @@ const analysisCache = new Map<string, Map<string, DepStatus>>();
 const analysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const renderTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
+let installedRefreshTimer: ReturnType<typeof setInterval> | undefined;
 let bunUnavailableWarned = false;
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -78,12 +85,26 @@ export function activate(context: vscode.ExtensionContext): void {
       forEachEditor(doc, scheduleAnalysis);
     }),
     vscode.workspace.onDidCloseTextDocument((doc) => {
-      analysisCache.delete(doc.uri.toString());
+      if (basename(doc.fileName) !== "package.json") {
+        return;
+      }
+      const key = doc.uri.toString();
+      analysisCache.delete(key);
+      dependencyLocations.delete(key);
+      if (doc.uri.scheme === "file") {
+        installedSnapshots.delete(dirname(doc.uri.fsPath));
+      }
+      for (const timers of [analysisTimers, renderTimers]) {
+        clearTimeout(timers.get(key));
+        timers.delete(key);
+      }
     }),
     // `bun i` (or any install) rewrites the lockfile — re-analyse so versions
     // and the pending hint reflect the new install.
-    lockWatcher.onDidChange(refreshAllVisible),
-    lockWatcher.onDidCreate(refreshAllVisible),
+    lockWatcher.onDidChange(invalidateInstalled),
+    lockWatcher.onDidCreate(invalidateInstalled),
+    lockWatcher.onDidDelete(invalidateInstalled),
+    vscode.workspace.onDidChangeWorkspaceFolders(invalidateInstalled),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("bunDeps")) {
         refreshAllVisible();
@@ -92,6 +113,17 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   setupBackgroundRefresh(context);
+  installedRefreshTimer = setInterval(
+    refreshVisibleInstalled,
+    INSTALLED_REFRESH_MS
+  );
+  context.subscriptions.push({
+    dispose: () => {
+      clearInterval(installedRefreshTimer);
+      installedSnapshots.clear();
+      dependencyLocations.clear();
+    },
+  });
   refreshAllVisible();
 }
 
@@ -104,6 +136,10 @@ export function deactivate(): void {
   if (refreshTimer) {
     clearInterval(refreshTimer);
   }
+  clearInterval(installedRefreshTimer);
+  installedSnapshots.clear();
+  dependencyLocations.clear();
+  analysisCache.clear();
 }
 
 function config(): vscode.WorkspaceConfiguration {
@@ -115,7 +151,12 @@ function getCachedStatuses(uri: string): Map<string, DepStatus> | undefined {
 }
 
 function isPackageJson(doc: vscode.TextDocument): boolean {
-  return doc.languageId === "json" && doc.fileName.endsWith("package.json");
+  // Virtual revisions share fsPath but must not own working-copy snapshots.
+  return (
+    doc.uri.scheme === "file" &&
+    doc.languageId === "json" &&
+    basename(doc.fileName) === "package.json"
+  );
 }
 
 function forEachEditor(
@@ -138,6 +179,72 @@ function refreshAllVisible(): void {
       scheduleAnalysis(editor);
     }
   }
+}
+
+function invalidateInstalled(): void {
+  installedSnapshots.clear();
+  for (const editor of vscode.window.visibleTextEditors) {
+    if (isPackageJson(editor.document)) {
+      scheduleRender(editor);
+    }
+  }
+  refreshAllVisible();
+}
+
+function refreshVisibleInstalled(): void {
+  if (!config().get<boolean>("enable", true)) {
+    return;
+  }
+  const documents = new Set(
+    vscode.window.visibleTextEditors.map((editor) => editor.document)
+  );
+  for (const doc of documents) {
+    if (isPackageJson(doc) && dependencyLocations.get(doc).length > 0) {
+      refreshInstalled(doc).catch(reportError);
+    }
+  }
+}
+
+async function refreshInstalled(
+  doc: vscode.TextDocument
+): Promise<InstalledSnapshot | undefined> {
+  if (doc.isClosed) {
+    return;
+  }
+  const snapshot = await installedSnapshots.refresh(
+    dirname(doc.uri.fsPath),
+    dependencyLocations.get(doc)
+  );
+  if (snapshot !== undefined && !doc.isClosed) {
+    renderDocument(doc);
+  }
+  return snapshot;
+}
+
+function renderDocument(doc: vscode.TextDocument): void {
+  if (doc.isClosed) {
+    return;
+  }
+  const locations = dependencyLocations.get(doc);
+  if (locations.length === 0) {
+    installedSnapshots.delete(dirname(doc.uri.fsPath));
+  }
+  if (locations.length === 0 || !config().get<boolean>("enable", true)) {
+    forEachEditor(doc, (editor) => decorator.clear(editor));
+    return;
+  }
+  const { snapshot, loading } = installedSnapshots.ensure(
+    dirname(doc.uri.fsPath),
+    locations
+  );
+  loading
+    ?.then((loaded) => {
+      if (loaded !== undefined && !doc.isClosed) {
+        renderDocument(doc);
+      }
+    })
+    .catch(reportError);
+  forEachEditor(doc, (editor) => renderEditor(editor, snapshot));
 }
 
 function debounce(
@@ -173,13 +280,15 @@ function scheduleRender(editor: vscode.TextEditor): void {
     renderTimers,
     editor.document.uri.toString(),
     RENDER_DEBOUNCE_MS,
-    () => renderEditor(editor)
+    () => renderDocument(editor.document)
   );
 }
 
-// Cheap: re-parse the live text, recompute the pending-install hint from
-// node_modules, and render using whatever registry data is already cached.
-function renderEditor(editor: vscode.TextEditor): void {
+// Warm edits only consult versioned document locations and installed snapshots.
+function renderEditor(
+  editor: vscode.TextEditor,
+  snapshot?: InstalledSnapshot
+): void {
   const cfg = config();
   if (!cfg.get<boolean>("enable", true)) {
     decorator.clear(editor);
@@ -187,7 +296,10 @@ function renderEditor(editor: vscode.TextEditor): void {
   }
 
   const doc = editor.document;
-  const locations = findDependencyLocations(doc.getText());
+  if (doc.isClosed) {
+    return;
+  }
+  const locations = dependencyLocations.get(doc);
   if (locations.length === 0) {
     decorator.clear(editor);
     return;
@@ -195,10 +307,7 @@ function renderEditor(editor: vscode.TextEditor): void {
 
   const statuses = analysisCache.get(doc.uri.toString()) ?? new Map();
   const { pending, conflicts, unusedCatalogs, catalogConsumerCounts } =
-    computeAnnotations(dirname(doc.uri.fsPath), locations);
-  if (doc.isClosed) {
-    return;
-  }
+    computeAnnotations(snapshot ?? { installed: new Map() }, locations);
   output.appendLine(
     `[render] ${doc.fileName}: ${locations.length} deps, ${statuses.size} analysed, ${pending.size} pending install, ${conflicts.size} catalog conflict(s), ${unusedCatalogs.size} unused catalog(s)`
   );
@@ -222,9 +331,13 @@ async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
   }
 
   const doc = editor.document;
+  if (doc.isClosed) {
+    return;
+  }
   const cwd = dirname(doc.uri.fsPath);
-  const locations = findDependencyLocations(doc.getText());
+  const locations = dependencyLocations.get(doc);
   if (locations.length === 0) {
+    installedSnapshots.delete(cwd);
     decorator.clear(editor);
     output.appendLine(
       `[analyze] ${doc.fileName}: no dependency sections found`
@@ -232,7 +345,8 @@ async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
     return;
   }
 
-  if (!(await ensureBunAvailable())) {
+  const snapshot = await refreshInstalled(doc);
+  if (snapshot === undefined || doc.isClosed || !(await ensureBunAvailable())) {
     return;
   }
 
@@ -243,7 +357,10 @@ async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
   );
 
   try {
-    const statuses = await analyze(cwd, locations, severityThreshold);
+    const statuses = await analyze(cwd, locations, severityThreshold, snapshot);
+    if (doc.isClosed) {
+      return;
+    }
     analysisCache.set(doc.uri.toString(), statuses);
     const outdated = [...statuses.values()].filter((s) => s.outdated).length;
     const vulnerable = [...statuses.values()].filter(
@@ -262,7 +379,7 @@ async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
   }
 
   if (!doc.isClosed) {
-    renderEditor(editor);
+    renderDocument(doc);
   }
 }
 

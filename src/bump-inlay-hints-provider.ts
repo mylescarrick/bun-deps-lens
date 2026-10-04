@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { computeBumpTarget } from "./bump-target";
-import { findDependencyLocations } from "./package-json";
+import { dependencyLocations } from "./document-locations";
 import type { DepStatus } from "./types";
 
 export class BumpInlayHintsProvider implements vscode.InlayHintsProvider {
@@ -24,7 +24,7 @@ export class BumpInlayHintsProvider implements vscode.InlayHintsProvider {
     }
 
     const hints: vscode.InlayHint[] = [];
-    for (const location of findDependencyLocations(document.getText())) {
+    for (const location of dependencyLocations.get(document)) {
       if (
         location.valueEndLine < range.start.line ||
         location.valueStartLine > range.end.line

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { access, readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 const LOCKFILE_NAMES = ["bun.lock", "bun.lockb"] as const;
@@ -18,6 +18,7 @@ export interface DirectDependent {
 export interface LockfileIndex {
   catalogConsumers: (name: string) => string[];
   directDependents: (name: string) => DirectDependent[];
+  hasResolvedSpecifier: (name: string, spec: string) => boolean;
   resolvedVersions: (name: string) => string[];
   topLevelResolvedVersion: (name: string) => string | undefined;
 }
@@ -34,13 +35,17 @@ interface RawLockfile {
   workspaces?: Record<string, RawWorkspace>;
 }
 
-export function findLockfile(startDir: string): string | null {
+export async function findLockfile(startDir: string): Promise<string | null> {
   let dir = startDir;
   for (;;) {
     for (const name of LOCKFILE_NAMES) {
       const candidate = join(dir, name);
-      if (existsSync(candidate)) {
+      try {
+        // biome-ignore lint/performance/noAwaitInLoops: nearest lockfile wins; probe parents only after a miss
+        await access(candidate);
         return candidate;
+      } catch {
+        // The lockfile may live in a parent workspace.
       }
     }
     const parent = dirname(dir);
@@ -186,7 +191,10 @@ export function parseLockfile(text: string): LockfileIndex {
   try {
     raw = JSON.parse(stripTrailingCommas(text)) as RawLockfile;
   } catch {
-    return emptyIndex();
+    return emptyIndex(text);
+  }
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return emptyIndex(text);
   }
 
   const resolved = new Map<string, Set<string>>();
@@ -200,58 +208,52 @@ export function parseLockfile(text: string): LockfileIndex {
   return {
     catalogConsumers: (name) => [...(consumers.get(name) ?? [])],
     directDependents: (name) => directs.get(name) ?? [],
+    // Preserve the existing literal fallback for platform-skipped packages.
+    hasResolvedSpecifier: (name, spec) => text.includes(`${name}@${spec}`),
     resolvedVersions: (name) => [...(resolved.get(name) ?? [])],
     topLevelResolvedVersion: (name) => topLevel.get(name),
   };
 }
 
-function emptyIndex(): LockfileIndex {
+function emptyIndex(text: string): LockfileIndex {
   return {
     catalogConsumers: () => [],
     directDependents: () => [],
+    hasResolvedSpecifier: (name, spec) => text.includes(`${name}@${spec}`),
     resolvedVersions: () => [],
     topLevelResolvedVersion: () => undefined,
   };
 }
 
-interface LoadedLockfile {
+export interface LoadedLockfile {
   index: LockfileIndex;
+  path: string;
   root: string;
+  stamp: string;
 }
 
-interface CacheEntry extends LoadedLockfile {
-  mtimeMs: number;
-}
-
-const cache = new Map<string, CacheEntry>();
-
-// Parses the nearest text-format bun.lock, cached by mtime so it only re-parses
-// after an install rewrites the lockfile.
-export function loadLockfileIndex(
-  startDir: string
-): LoadedLockfile | undefined {
-  const lockfile = findLockfile(startDir);
+// Callers own the cached snapshot, so closing a project releases its index.
+export async function loadLockfileIndex(
+  startDir: string,
+  previous?: LoadedLockfile
+): Promise<LoadedLockfile | undefined> {
+  const lockfile = await findLockfile(startDir);
   if (lockfile === null || lockfile.endsWith(".lockb")) {
     return;
   }
-  let mtimeMs: number;
   try {
-    ({ mtimeMs } = statSync(lockfile));
+    const metadata = await stat(lockfile);
+    const stamp = `${metadata.ino}:${metadata.size}:${metadata.mtimeMs}:${metadata.ctimeMs}`;
+    if (previous?.path === lockfile && previous.stamp === stamp) {
+      return previous;
+    }
+    return {
+      index: parseLockfile(await readFile(lockfile, "utf8")),
+      path: lockfile,
+      root: dirname(lockfile),
+      stamp,
+    };
   } catch {
-    return;
+    // Deleted or unreadable lockfiles provide no local resolution data.
   }
-  const cached = cache.get(lockfile);
-  if (cached !== undefined && cached.mtimeMs === mtimeMs) {
-    const { index: cachedIndex, root: cachedRoot } = cached;
-    return { index: cachedIndex, root: cachedRoot };
-  }
-  let index: LockfileIndex;
-  try {
-    index = parseLockfile(readFileSync(lockfile, "utf8"));
-  } catch {
-    return;
-  }
-  const root = dirname(lockfile);
-  cache.set(lockfile, { index, mtimeMs, root });
-  return { index, root };
 }

@@ -2,6 +2,7 @@ import { parseAudit } from "./bun/audit";
 import { parseOutdated } from "./bun/outdated";
 import { runBun } from "./bun/runner";
 import { computeResolvedVersions } from "./installed";
+import type { InstalledSnapshot } from "./installed-snapshot";
 import { buildStatuses } from "./status";
 import type { DepLocation, DepStatus, Severity } from "./types";
 
@@ -9,6 +10,7 @@ export async function analyze(
   cwd: string,
   locations: DepLocation[],
   severityThreshold: Severity,
+  snapshot: InstalledSnapshot,
   bunPath = "bun"
 ): Promise<Map<string, DepStatus>> {
   const [outdatedResult, auditResult] = await Promise.all([
@@ -26,7 +28,7 @@ export async function analyze(
   const audit = parseAudit(auditResult.stdout);
 
   const depNames = [...new Set(locations.map((loc) => loc.name))];
-  const resolvedVersions = computeResolvedVersions(cwd, locations);
+  const resolvedVersions = computeResolvedVersions(snapshot, locations);
 
   return buildStatuses(
     depNames,

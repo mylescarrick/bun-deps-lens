@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadLockfileIndex, parseLockfile } from "../src/bun/lockfile";
 import {
   computeAnnotations,
   computeResolvedVersions,
   isPending,
 } from "../src/installed";
+import { loadInstalledSnapshot } from "../src/installed-snapshot";
 import type { DepLocation } from "../src/types";
 
 describe("isPending", () => {
@@ -26,18 +28,26 @@ describe("isPending", () => {
   });
 
   test("not pending when package is resolved in the lockfile but not on disk", () => {
-    const root = mkdtempSync(join(tmpdir(), "bun-deps-installed-"));
-    writeFileSync(join(root, "bun.lock"), "# @esbuild/linux-arm64@0.28.1\n");
-    expect(isPending("@esbuild/linux-arm64", "0.28.1", undefined, root)).toBe(
-      false
-    );
+    expect(
+      isPending(
+        "@esbuild/linux-arm64",
+        "0.28.1",
+        undefined,
+        parseLockfile("# @esbuild/linux-arm64@0.28.1\n")
+      )
+    ).toBe(false);
   });
 
-  test("fixture lockfile marks platform-skipped @esbuild/linux-arm64 as not pending", () => {
+  test("fixture lockfile marks platform-skipped @esbuild/linux-arm64 as not pending", async () => {
     const root = join(import.meta.dir, "../fixtures/monorepo-catalog");
-    expect(isPending("@esbuild/linux-arm64", "0.20.2", undefined, root)).toBe(
-      false
-    );
+    expect(
+      isPending(
+        "@esbuild/linux-arm64",
+        "0.20.2",
+        undefined,
+        (await loadLockfileIndex(root))?.index
+      )
+    ).toBe(false);
   });
 
   test("ignores non-semver specifiers", () => {
@@ -68,7 +78,7 @@ function installPackage(root: string, name: string, version: string): void {
 }
 
 describe("computeAnnotations catalog entries", () => {
-  test("resolved catalog with a hoisted mismatch reports a conflict, not pending", () => {
+  test("resolved catalog with a hoisted mismatch reports a conflict, not pending", async () => {
     const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
     writeFileSync(
       join(root, "bun.lock"),
@@ -96,7 +106,7 @@ describe("computeAnnotations catalog entries", () => {
     );
     installPackage(root, "@cloudflare/workers-types", "4.20251125.0");
 
-    const { pending, conflicts, unusedCatalogs } = computeAnnotations(root, [
+    const { pending, conflicts, unusedCatalogs } = await annotations(root, [
       catalogLocation("@cloudflare/workers-types", "4.20260617.1"),
     ]);
 
@@ -108,7 +118,7 @@ describe("computeAnnotations catalog entries", () => {
     });
   });
 
-  test("unused catalog entry is marked unused without pending or conflict", () => {
+  test("unused catalog entry is marked unused without pending or conflict", async () => {
     const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
     writeFileSync(
       join(root, "bun.lock"),
@@ -119,7 +129,7 @@ describe("computeAnnotations catalog entries", () => {
       })
     );
 
-    const { pending, conflicts, unusedCatalogs } = computeAnnotations(root, [
+    const { pending, conflicts, unusedCatalogs } = await annotations(root, [
       catalogLocation("@hono/swagger-ui", "^0.5.3"),
     ]);
 
@@ -128,7 +138,7 @@ describe("computeAnnotations catalog entries", () => {
     expect(unusedCatalogs.has("@hono/swagger-ui")).toBe(true);
   });
 
-  test("consumed catalog with no satisfying resolution is pending", () => {
+  test("consumed catalog with no satisfying resolution is pending", async () => {
     const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
     writeFileSync(
       join(root, "bun.lock"),
@@ -139,7 +149,7 @@ describe("computeAnnotations catalog entries", () => {
       })
     );
 
-    const { pending, conflicts, unusedCatalogs } = computeAnnotations(root, [
+    const { pending, conflicts, unusedCatalogs } = await annotations(root, [
       catalogLocation("foo", "^2.0.0"),
     ]);
 
@@ -148,7 +158,7 @@ describe("computeAnnotations catalog entries", () => {
     expect(unusedCatalogs.size).toBe(0);
   });
 
-  test("catalog resolved versions prefer top-level copy over nested transitive copies", () => {
+  test("catalog resolved versions prefer top-level copy over nested transitive copies", async () => {
     const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
     writeFileSync(
       join(root, "bun.lock"),
@@ -162,14 +172,14 @@ describe("computeAnnotations catalog entries", () => {
       })
     );
 
-    const versions = computeResolvedVersions(root, [
-      catalogLocation("ws", "^8.21.0"),
-    ]);
+    const locations = [catalogLocation("ws", "^8.21.0")];
+    const snapshot = await loadInstalledSnapshot(root, ["ws"]);
+    const versions = computeResolvedVersions(snapshot, locations);
 
     expect(versions.get("ws")).toEqual(["8.21.0"]);
   });
 
-  test("cleanly resolved catalog produces no annotations", () => {
+  test("cleanly resolved catalog produces no annotations", async () => {
     const root = mkdtempSync(join(tmpdir(), "bun-deps-catalog-"));
     writeFileSync(
       join(root, "bun.lock"),
@@ -181,7 +191,7 @@ describe("computeAnnotations catalog entries", () => {
     );
     installPackage(root, "bar", "1.2.0");
 
-    const { pending, conflicts, unusedCatalogs } = computeAnnotations(root, [
+    const { pending, conflicts, unusedCatalogs } = await annotations(root, [
       catalogLocation("bar", "^1.0.0"),
     ]);
 
@@ -190,3 +200,11 @@ describe("computeAnnotations catalog entries", () => {
     expect(unusedCatalogs.size).toBe(0);
   });
 });
+
+async function annotations(root: string, locations: DepLocation[]) {
+  const snapshot = await loadInstalledSnapshot(
+    root,
+    locations.map((location) => location.name)
+  );
+  return computeAnnotations(snapshot, locations);
+}

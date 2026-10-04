@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { computeBumpTarget } from "./bump-target";
-import { findDependencyLocations } from "./package-json";
+import { dependencyLocations } from "./document-locations";
 import type { DepStatus } from "./types";
 
 export class BumpCodeActionProvider implements vscode.CodeActionProvider {
@@ -24,7 +24,7 @@ export class BumpCodeActionProvider implements vscode.CodeActionProvider {
     }
 
     const actions: vscode.CodeAction[] = [];
-    for (const location of findDependencyLocations(document.getText())) {
+    for (const location of dependencyLocations.get(document)) {
       const valueRange = new vscode.Range(
         location.valueStartLine,
         location.valueStartCol,

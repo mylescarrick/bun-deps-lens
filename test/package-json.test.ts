@@ -96,3 +96,38 @@ describe("findDependencyLocations", () => {
     expect(eslint?.catalogName).toBeUndefined();
   });
 });
+
+test("CRLF and Unicode preserve UTF-16 version columns during incomplete edits", () => {
+  const text =
+    '{\r\n  "dependencies": {\r\n    "😀": "1.0.0"\r\n  },\r\n  "name":';
+  const [location] = findDependencyLocations(text);
+  expect(location).toMatchObject({
+    declaredRange: "1.0.0",
+    name: "😀",
+    valueEndCol: 17,
+    valueEndLine: 2,
+    valueStartCol: 10,
+    valueStartLine: 2,
+  });
+});
+
+test("large manifests retain correct first and final ranges", () => {
+  const dependencies = Object.fromEntries(
+    Array.from({ length: 1000 }, (_, i) => [`dep-${i}`, "1.0.0"])
+  );
+  const text = JSON.stringify({ dependencies }, null, 2);
+  const locations = findDependencyLocations(text);
+  expect(locations).toHaveLength(1000);
+  expect(locations[0]).toMatchObject({
+    name: "dep-0",
+    valueEndCol: 20,
+    valueStartCol: 13,
+    valueStartLine: 2,
+  });
+  expect(locations[999]).toMatchObject({
+    name: "dep-999",
+    valueEndCol: 22,
+    valueStartCol: 15,
+    valueStartLine: 1001,
+  });
+});

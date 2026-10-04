@@ -18,10 +18,10 @@
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
-    "typescript": "catalog:",
+    "@esbuild/darwin-arm64": "0.20.2",
+    "@esbuild/linux-arm64": "0.20.2",
     "esbuild": "catalog:build",
     "ts-morph": "^23.0.0",
-    "@esbuild/darwin-arm64": "0.20.2",
-    "@esbuild/linux-arm64": "0.20.2"
+    "typescript": "catalog:"
   }
 }

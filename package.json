@@ -1,43 +1,8 @@
 {
-  "devDependencies": {
-    "@biomejs/biome": "2.5.2",
-    "@types/bun": "latest",
-    "@types/semver": "^7.7.1",
-    "@types/vscode": "^1.90.0",
-    "@vscode/vsce": "^3.2.0",
-    "typescript": "^7.0.2",
-    "ultracite": "7.9.3"
-  },
   "name": "bun-deps",
-  "scripts": {
-    "build": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --minify --sourcemap=linked",
-    "build:dev": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked",
-    "watch": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked --watch",
-    "typecheck": "tsc --noEmit",
-    "lint": "ultracite check",
-    "format": "ultracite fix",
-    "setup:fixtures": "for d in fixtures/monorepo-catalog fixtures/simple-single; do (cd \"$d\" && bun install); done",
-    "test": "bun test",
-    "package": "vsce package --no-dependencies",
-    "publish": "vsce publish --no-dependencies",
-    "vscode:prepublish": "bun run build"
-  },
-  "version": "0.4.0",
   "displayName": "Bun Deps",
+  "version": "0.4.0",
   "description": "Inline colour-coded dependency status for package.json, with one-click updates and catalog navigation — powered by Bun's outdated & audit CLIs.",
-  "publisher": "myles-carrick",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mylescarrick/bun-deps-lens.git"
-  },
-  "bugs": {
-    "url": "https://github.com/mylescarrick/bun-deps-lens/issues"
-  },
-  "homepage": "https://github.com/mylescarrick/bun-deps-lens#readme",
-  "engines": {
-    "vscode": "^1.90.0"
-  },
   "categories": [
     "Linters",
     "Visualization"
@@ -52,18 +17,30 @@
     "catalog",
     "workspaces"
   ],
-  "icon": "media/icon.png",
-  "pricing": "Free",
-  "galleryBanner": {
-    "color": "#14151A",
-    "theme": "dark"
+  "homepage": "https://github.com/mylescarrick/bun-deps-lens#readme",
+  "bugs": {
+    "url": "https://github.com/mylescarrick/bun-deps-lens/issues"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mylescarrick/bun-deps-lens.git"
+  },
+  "license": "MIT",
+  "publisher": "myles-carrick",
   "main": "./dist/extension.js",
-  "activationEvents": [
-    "workspaceContains:**/bun.lock",
-    "workspaceContains:**/bun.lockb",
-    "workspaceContains:**/bunfig.toml"
-  ],
+  "scripts": {
+    "build": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --minify --sourcemap=linked",
+    "build:dev": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked",
+    "format": "ultracite fix",
+    "lint": "ultracite check",
+    "package": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies",
+    "setup:fixtures": "for d in fixtures/monorepo-catalog fixtures/simple-single; do (cd \"$d\" && bun install); done",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "bun run build",
+    "watch": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked --watch"
+  },
   "contributes": {
     "commands": [
       {
@@ -109,7 +86,30 @@
       }
     }
   },
+  "activationEvents": [
+    "workspaceContains:**/bun.lock",
+    "workspaceContains:**/bun.lockb",
+    "workspaceContains:**/bunfig.toml"
+  ],
   "dependencies": {
     "semver": "^7.8.5"
-  }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/bun": "^1.4.2",
+    "@types/semver": "^7.8.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "^4.0.0",
+    "typescript": "^7.0.2",
+    "ultracite": "7.12.2"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#14151A",
+    "theme": "dark"
+  },
+  "pricing": "Free"
 }

@@ -1,0 +1,137 @@
+{
+  "node": "v24.18.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "results": [
+    {
+      "snapshotLoadMs": 170.434,
+      "case": "installed-50",
+      "textBytes": 1166,
+      "parse": {
+        "medianMs": 0.067,
+        "p95Ms": 0.077,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 0.13,
+        "p95Ms": 0.299,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmEdit": {
+        "medianMs": 0.14,
+        "p95Ms": 0.193,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "snapshotLoadMs": 252.403,
+      "case": "installed-500",
+      "textBytes": 11916,
+      "parse": {
+        "medianMs": 0.291,
+        "p95Ms": 0.33,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 0.622,
+        "p95Ms": 0.812,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmEdit": {
+        "medianMs": 0.675,
+        "p95Ms": 0.734,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "snapshotLoadMs": 24.128,
+      "case": "installed-1000",
+      "textBytes": 23916,
+      "parse": {
+        "medianMs": 0.211,
+        "p95Ms": 0.266,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "annotations": {
+        "medianMs": 0.596,
+        "p95Ms": 0.656,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      },
+      "warmEdit": {
+        "medianMs": 0.921,
+        "p95Ms": 1.219,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      }
+    },
+    {
+      "snapshotLoadMs": 32.708,
+      "case": "100-missing-optionals-1MB-lock",
+      "lockBytes": 1150590,
+      "annotations": {
+        "medianMs": 1.814,
+        "p95Ms": 1.83,
+        "callsPerRun": {
+          "syncCalls": 0,
+          "exists": 0,
+          "read": 0,
+          "stat": 0,
+          "lockBytes": 0
+        }
+      }
+    }
+  ]
+}

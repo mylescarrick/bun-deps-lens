@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { computeBumpTarget } from "./bump-target";
-import { findDependencyLocations } from "./package-json";
+import { dependencyLocations } from "./document-locations";
 import type { DepStatus } from "./types";
 
 export class BumpCodeActionProvider implements vscode.CodeActionProvider {
@@ -24,7 +24,7 @@ export class BumpCodeActionProvider implements vscode.CodeActionProvider {
     }
 
     const actions: vscode.CodeAction[] = [];
-    for (const location of findDependencyLocations(document.getText())) {
+    for (const location of dependencyLocations.get(document)) {
       const valueRange = new vscode.Range(
         location.valueStartLine,
         location.valueStartCol,
@@ -42,9 +42,17 @@ export class BumpCodeActionProvider implements vscode.CodeActionProvider {
         `Update ${location.name} to ${target.newValue}`,
         vscode.CodeActionKind.QuickFix
       );
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(document.uri, target.range, target.newValue);
-      action.edit = edit;
+      action.command = {
+        arguments: [
+          {
+            location,
+            newValue: target.newValue,
+            uri: document.uri.toString(),
+          },
+        ],
+        command: "bunDeps.bumpToLatest",
+        title: action.title,
+      };
       actions.push(action);
     }
     return actions;

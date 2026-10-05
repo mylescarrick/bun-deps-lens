@@ -1,0 +1,278 @@
+{
+  "slug": "spring-cleaning",
+  "date": "2026-10-03",
+  "baseline": "d1401a4",
+  "plan": "plans.spring-cleaning.md",
+  "runtimeChangesApproved": false,
+  "openDecisions": [
+    "Approve proposed five-minute registry cache TTL with explicit/install refresh bypass",
+    "Approve proposed thirty-second subprocess deadline",
+    "Obtain exact issue #4 reproduction in an Extension Development Host",
+    "Decide whether activation changes belong in this pass"
+  ],
+  "evidenceArtifacts": [
+    "reports/spring-cleaning-20261003/benchmark.sh",
+    "reports/spring-cleaning-20261003/baseline.json",
+    "reports/spring-cleaning-20261003/repeat.json",
+    "reports/spring-cleaning-20261003/after.json",
+    "plans.spring-cleaning.progress.md",
+    "reports/spring-cleaning-20261003/followup-verification.json",
+    "reports/spring-cleaning-20261003/after-review-fixes.json",
+    "reports/spring-cleaning-20261003/fresh-review-source.json",
+    "reports/spring-cleaning-20261003/opus-5-5-fresh-standards-review.md",
+    "reports/spring-cleaning-20261003/opus-5-5-fresh-spec-review.md",
+    "reports/spring-cleaning-20261003/opus-5-5-fresh-review-summary.md"
+  ],
+  "tasks": [
+    {
+      "id": "cleanup",
+      "status": "completed",
+      "dependencies": [],
+      "acceptance": "Updated stable toolchain; compatible VS Code API floor; clean frozen install; lint, types, tests, package and diff checks pass; no development artifacts in VSIX",
+      "verification": [
+        "bun install --frozen-lockfile",
+        "bun run typecheck",
+        "bun run lint",
+        "bun test",
+        "bun run package",
+        "bun audit --production",
+        "git diff --check"
+      ],
+      "evidence": [
+        "2026-10-03: frozen lockfile install passes in worktree and separate clean directory",
+        "Typecheck and lint pass; 65 tests pass, zero fail, 121 assertions",
+        "vsce 4.0.0 builds nine-file VSIX of 91.91 KB, down from 142.76 KB",
+        "ZIP assertions confirm runtime bundle, source map and icon present; fixtures, CI, reports, plans and publishing notes absent",
+        "Production audit passes; full audit retains one dev-only high braces advisory with no patched release",
+        "git diff --check passes; runtime source files are unchanged"
+      ]
+    },
+    {
+      "id": "snapshot",
+      "status": "completed",
+      "dependencies": ["cleanup"],
+      "acceptance": "Zero synchronous disk calls on warm edits; optional fallback no longer rereads lockfile per dependency; correct invalidation and catalog/optional behavior",
+      "verification": [
+        "Snapshot invalidation tests",
+        "Existing installed and lockfile tests",
+        "Node benchmark comparison",
+        "bun run test:extension"
+      ],
+      "evidence": [
+        "2026-10-03: typecheck and lint pass after the last runtime source change",
+        "82 tests pass, zero fail, 157 assertions; existing catalog and optional-dependency regressions preserved",
+        "bun run test:extension passes under Node with editor/process adapters; warm edits and provider requests perform zero synchronous filesystem calls",
+        "bun run package succeeds: nine-file VSIX, 95.52 KB; development artifacts excluded",
+        "Production audit and git diff --check pass; separate real VS Code UI/CPU profiling is still outstanding",
+        "Warm optional fallback lockfile bytes drop from 115059000 to zero per edit; final annotation median 1.814 ms",
+        "Warm 1000-entry parse plus local annotation median 0.921 ms with zero synchronous I/O",
+        "Local snapshots revalidate every 30 seconds while dependency-bearing package.json is visible and enabled, independently of registry refresh",
+        "In-flight eviction, manifest changes without lockfile rewrites, lock deletion/replacement, unknown new names, binary locks, malformed manifests and workspace-local versions covered"
+      ]
+    },
+    {
+      "id": "parser",
+      "status": "completed",
+      "dependencies": ["cleanup"],
+      "acceptance": "Shared URI/version cache and near-linear location parsing; precise CRLF/Unicode/unsaved-edit ranges; investigate <=5ms warmed median for 1000 entries on baseline machine",
+      "verification": [
+        "Parser range and scaling tests",
+        "Node benchmark comparison"
+      ],
+      "evidence": [
+        "2026-10-03: typecheck and lint pass after the last runtime source change",
+        "82 tests pass, zero fail, 157 assertions; existing catalog and optional-dependency regressions preserved",
+        "bun run test:extension passes under Node with editor/process adapters; warm edits and provider requests perform zero synchronous filesystem calls",
+        "bun run package succeeds: nine-file VSIX, 95.52 KB; development artifacts excluded",
+        "Production audit and git diff --check pass; separate real VS Code UI/CPU profiling is still outstanding",
+        "Same-machine 1000-entry parser: 30.687 ms red baseline versus 0.211 ms final warmed median",
+        "One parse per URI/version shared by decorations, quick fixes, inlay hints and catalog navigation; close/reopen invalidates cache",
+        "CRLF, Unicode UTF-16 columns, incomplete edits and 1000-entry first/final ranges covered"
+      ]
+    },
+    {
+      "id": "scheduler",
+      "status": "awaiting-approval",
+      "dependencies": ["snapshot", "parser"],
+      "acceptance": "Coalesced same-key analyses; immediate cached render; stale result rejection; all split editors and inlay hints update; scoped install events",
+      "verification": [
+        "Fake-clock and fake-runner lifecycle tests",
+        "Split-editor integration checks"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "runner",
+      "status": "awaiting-approval",
+      "dependencies": ["scheduler"],
+      "acceptance": "Deadline and cancellation bound all Bun commands; valid audit exit 1 survives; failed scans are never fresh green/security-clean",
+      "verification": [
+        "Timeout, abort, ENOENT and malformed-output tests",
+        "Offline and valid audit exit 1 tests"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "hover",
+      "status": "awaiting-approval",
+      "dependencies": ["cleanup"],
+      "acceptance": "Exact issue #4 symptom reproduced then fixed; one Bun Deps contribution while preserving built-in hover, annotation/value access and command links",
+      "verification": [
+        "Extension Development Host reproduction",
+        "Regression at verified hover seam",
+        "Light/dark/high-contrast and split-editor checks"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "profile",
+      "status": "awaiting-approval",
+      "dependencies": ["snapshot", "parser", "scheduler", "runner"],
+      "acceptance": "Real extension-host before/after activation, switch, edit, install and offline profiles; activation/debounce changes justified by evidence",
+      "verification": [
+        "VS Code extension-host CPU profiles",
+        "Repeat Node benchmark",
+        "Full project checks after last runtime change"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "review-fix-1",
+      "status": "completed",
+      "dependencies": ["snapshot", "parser"],
+      "acceptance": "Preserve cached registry decorations while local snapshots reload; settings changes do not invalidate installed data",
+      "verification": [
+        "Focused regression before/after fix",
+        "Full project checks before fresh Opus review"
+      ],
+      "evidence": [
+        "Lifecycle regression fails first for settings eviction, then for decoration blanking; both pass after the fix",
+        "bun run test:extension, bun run typecheck and git diff --check pass",
+        "Final follow-up verification passes: frozen install, typecheck, lint, 86 tests / 182 assertions, bundled lifecycle, zero-sync/async-I/O Node benchmark, VSIX build/content checks, production audit and diff check"
+      ]
+    },
+    {
+      "id": "review-fix-2",
+      "status": "completed",
+      "dependencies": ["review-fix-1"],
+      "acceptance": "Catalog definition requests resolve the nearest lockfile path without reading or parsing lockfile contents; preserve binary-lock behavior",
+      "verification": [
+        "Focused regression before/after fix",
+        "Full project checks before fresh Opus review"
+      ],
+      "evidence": [
+        "Actual catalog request regression fails with one lockfile content read; passes with zero after path-only lookup",
+        "Default/named catalogs, repeated requests, unsaved root edits and binary lockfiles pass lifecycle coverage",
+        "bun run test:extension, bun run typecheck and git diff --check pass",
+        "Final follow-up verification passes: frozen install, typecheck, lint, 86 tests / 182 assertions, bundled lifecycle, zero-sync/async-I/O Node benchmark, VSIX build/content checks, production audit and diff check"
+      ]
+    },
+    {
+      "id": "review-fix-3",
+      "status": "completed",
+      "dependencies": ["review-fix-2"],
+      "acceptance": "Incremental ensure loads only missing current names, prunes removed names, and retains full refresh for explicit/periodic revalidation with safe concurrent updates",
+      "verification": [
+        "Focused regression before/after fix",
+        "Full project checks before fresh Opus review"
+      ],
+      "evidence": [
+        "Unit test first fails for missing incremental API; rename regression fails with foo/f/fo/bar retained instead of only bar",
+        "Bundled extension regression fails with foo and bar reads; passes with exactly one bar read across split editors",
+        "17 snapshot tests / 50 assertions pass, including full-refresh promotion, force coalescing, deletion/invalidation races and final-name pruning",
+        "Known-name warm edits assert zero synchronous and zero asynchronous filesystem operations; typecheck, focused format and diff checks pass",
+        "Final follow-up verification passes: frozen install, typecheck, lint, 86 tests / 182 assertions, bundled lifecycle, zero-sync/async-I/O Node benchmark, VSIX build/content checks, production audit and diff check"
+      ]
+    },
+    {
+      "id": "review-fix-4",
+      "status": "completed",
+      "dependencies": ["review-fix-3"],
+      "acceptance": "New-name lifecycle test proves asynchronous classification completes, without fixed sleeps or contamination from another pending dependency",
+      "verification": [
+        "Focused regression before/after fix",
+        "Full project checks before fresh Opus review"
+      ],
+      "evidence": [
+        "bar declares 4.0.0 with 3.0.0 installed; lifecycle waits for bar-specific pending, then verifies a warm range correction clears it",
+        "No fixed sleep remains in the new-name test",
+        "Disposable negative-control harness with an unresolved bar read fails specifically at new-name async classification; unmodified harness passes",
+        "Final follow-up verification passes: frozen install, typecheck, lint, 86 tests / 182 assertions, bundled lifecycle, zero-sync/async-I/O Node benchmark, VSIX build/content checks, production audit and diff check"
+      ]
+    },
+    {
+      "id": "review-fix-5",
+      "status": "completed",
+      "dependencies": ["review-fix-4"],
+      "acceptance": "Closing virtual package buffers never evicts the working file snapshot; package caches have filesystem-only ownership",
+      "verification": [
+        "Focused regression before/after fix",
+        "Full project checks before fresh Opus review"
+      ],
+      "evidence": [
+        "Git-buffer close regression fails before filesystem-only eviction, then passes with retained pending state and zero async I/O",
+        "Virtual edit/save/activation scheduling regression fails with extra timers, then passes with file-scheme snapshot ownership",
+        "Virtual-only visible polling does no parsing/analysis; the next working edit stays memory-only",
+        "Focused format, typecheck and bundled lifecycle checks pass",
+        "Final follow-up verification passes: frozen install, typecheck, lint, 86 tests / 182 assertions, bundled lifecycle, zero-sync/async-I/O Node benchmark, VSIX build/content checks, production audit and diff check"
+      ]
+    },
+    {
+      "id": "review-after-fixes",
+      "status": "completed",
+      "dependencies": [
+        "review-fix-1",
+        "review-fix-2",
+        "review-fix-3",
+        "review-fix-4",
+        "review-fix-5"
+      ],
+      "acceptance": "Fresh read-only Opus 5.5 Standards and Spec reviews examine all uncommitted changes including untracked source/test files, independently confirm the five fixes, and label concrete new/pre-existing/deferred findings",
+      "verification": [
+        "Fresh contexts, exact requested model, durable reports, frozen source fingerprint"
+      ],
+      "evidence": [
+        "Fresh read-only Opus 5.5 workflow b44dd0b7-bf3a-4272-93b5-a7ff8f54a1a3 completed both independent axes",
+        "Spec verdict OK; all five fixes resolved, no new correctness defects",
+        "Standards verdict OK with notes; no hard violations or blockers, six optional P2 maintainability suggestions",
+        "All 47 frozen source input fingerprints unchanged; parent checks remain fresh for source",
+        "Reviewers ran no commands; real VS Code profiling and remote CI are still outstanding",
+        "reports/spring-cleaning-20261003/opus-5-5-fresh-review-summary.md"
+      ]
+    }
+  ],
+  "residualRisks": [
+    "One high-severity dev-only braces advisory, GHSA-vfj7-8cjw-p6xm; latest braces 3.0.3 is still affected",
+    "Synthetic core benchmarks are not full extension-host UI profiles",
+    "Issue #4 screenshot reviewed but exact VS Code symptom not reproduced locally",
+    "CI and Marketplace publication were not executed remotely",
+    "Cold snapshot I/O and lockfile parsing still cost time; warm-core benchmarks exclude decoration transport, editor UI, debounce and registry latency"
+  ],
+  "approvedRuntimeTasks": [
+    "snapshot",
+    "parser",
+    "review-fix-1",
+    "review-fix-2",
+    "review-fix-3",
+    "review-fix-4",
+    "review-fix-5"
+  ],
+  "delivery": {
+    "commitApproval": true,
+    "commits": [
+      {
+        "id": "6027562",
+        "scope": "toolchain and packaging",
+        "verification": "Isolated staged snapshot: typecheck, lint, 65 tests / 121 assertions and build pass"
+      },
+      {
+        "id": "3fc6136",
+        "scope": "reviewed snapshot/parser runtime and regressions",
+        "verification": "All 47 frozen source fingerprints match; prior full verification with 86 tests / 182 assertions and both Opus reviews applies"
+      }
+    ],
+    "evidence": "Portable plans, benchmark results and final reviews are recorded in the following documentation commit",
+    "pushAuthorized": false,
+    "publishAuthorized": false
+  }
+}

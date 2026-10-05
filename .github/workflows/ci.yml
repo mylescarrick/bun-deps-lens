@@ -19,6 +19,10 @@ jobs:
       - run: bun run lint
       - run: bun run typecheck
       - run: bun test
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+      - run: bun run test:extension
       # Validate that a publishable VSIX can be produced.
       - run: bun run package
 
@@ -39,7 +43,7 @@ jobs:
         with:
           bun-version: latest
       # vsce is a Node CLI and needs Node >= 22; the build itself runs via bun.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24.x
       - run: bun install --frozen-lockfile

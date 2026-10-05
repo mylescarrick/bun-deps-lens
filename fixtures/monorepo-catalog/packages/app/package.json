@@ -5,7 +5,7 @@
     "lodash": "4.17.2"
   },
   "devDependencies": {
-    "typescript": "catalog:",
-    "esbuild": "catalog:build"
+    "esbuild": "catalog:build",
+    "typescript": "catalog:"
   }
 }

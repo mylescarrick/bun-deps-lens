@@ -24,6 +24,7 @@ interface Offset {
 // rather than JSON.parse so it still works while the user is mid-edit.
 export function findDependencyLocations(text: string): DepLocation[] {
   const locations: DepLocation[] = [];
+  const lineStarts = findLineStarts(text);
 
   for (const section of SECTIONS) {
     const block = findSectionBlock(text, section);
@@ -34,7 +35,7 @@ export function findDependencyLocations(text: string): DepLocation[] {
     if (block.blocks !== undefined) {
       for (const nested of block.blocks) {
         parseEntries(
-          text,
+          lineStarts,
           locations,
           "workspaces.catalogs",
           nested,
@@ -46,14 +47,14 @@ export function findDependencyLocations(text: string): DepLocation[] {
 
     // Catalog values use catalog: in consumer sections, but the catalog block
     // itself contains plain semver ranges. Treat those as the declared range.
-    parseEntries(text, locations, section, block);
+    parseEntries(lineStarts, locations, section, block);
   }
 
   return locations;
 }
 
 function parseEntries(
-  text: string,
+  lineStarts: number[],
   locations: DepLocation[],
   section: DepSection,
   block: { body: string; start: number },
@@ -66,8 +67,11 @@ function parseEntries(
     const declaredRange = match[2] as string;
     const valueQuoteOffset =
       block.start + match.index + match[0].lastIndexOf(`"${declaredRange}"`);
-    const start = toOffset(text, valueQuoteOffset);
-    const end = toOffset(text, valueQuoteOffset + declaredRange.length + 2);
+    const start = toOffset(lineStarts, valueQuoteOffset);
+    const end = toOffset(
+      lineStarts,
+      valueQuoteOffset + declaredRange.length + 2
+    );
 
     locations.push({
       catalogName,
@@ -212,14 +216,26 @@ function findMatchingBrace(text: string, bodyStart: number): number | null {
   return depth === 0 ? i : null;
 }
 
-function toOffset(text: string, index: number): Offset {
-  let line = 0;
-  let lineStart = 0;
-  for (let i = 0; i < index; i += 1) {
+function findLineStarts(text: string): number[] {
+  const starts = [0];
+  for (let i = 0; i < text.length; i += 1) {
     if (text[i] === "\n") {
-      line += 1;
-      lineStart = i + 1;
+      starts.push(i + 1);
     }
   }
-  return { col: index - lineStart, line };
+  return starts;
+}
+
+function toOffset(lineStarts: number[], index: number): Offset {
+  let low = 0;
+  let high = lineStarts.length;
+  while (low + 1 < high) {
+    const middle = Math.floor((low + high) / 2);
+    if ((lineStarts[middle] as number) <= index) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+  return { col: index - (lineStarts[low] as number), line: low };
 }

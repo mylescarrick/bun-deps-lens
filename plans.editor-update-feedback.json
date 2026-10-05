@@ -1,0 +1,76 @@
+{
+  "title": "Editor update feedback",
+  "status": "completed",
+  "diagnosis": {
+    "runtime": "bundled extension under Node editor/process adapters",
+    "cases": ["hover", "inlay", "autosave", "dirty"],
+    "runs": 2,
+    "failingAssertionsPerRun": 4,
+    "actualVSCodeVerified": false
+  },
+  "decisions": {
+    "dirtyDocumentAutosave": "approved: clean or provably extension-owned buffer only; preserve unrelated dirty edits",
+    "quickFixSaveParity": "same update command",
+    "fixtureReset": "authorised and completed: restored five tested manifests/lockfiles to HEAD"
+  },
+  "tasks": [
+    {
+      "id": "hover-ownership",
+      "status": "completed",
+      "dependsOn": [],
+      "acceptance": "One hover contribution across value and annotation with and without a comma"
+    },
+    {
+      "id": "inlay-refresh",
+      "status": "completed",
+      "dependsOn": [],
+      "acceptance": "Registry completion notifies the editor without another edit; event resources disposed"
+    },
+    {
+      "id": "update-save",
+      "status": "completed",
+      "dependsOn": [],
+      "acceptance": "Save policy applied after successful command edit; failures are surfaced"
+    },
+    {
+      "id": "pending-save-copy",
+      "status": "completed",
+      "dependsOn": ["update-save"],
+      "acceptance": "Dirty pending manifests say save first; saved manifests say install"
+    },
+    {
+      "id": "verification",
+      "status": "completed",
+      "dependsOn": [
+        "hover-ownership",
+        "inlay-refresh",
+        "update-save",
+        "pending-save-copy"
+      ],
+      "acceptance": "Durable regressions, typecheck, lint, unit tests, lifecycle, build, then human UI retest"
+    }
+  ],
+  "delivery": {
+    "commit": "authorised",
+    "push": "authorised",
+    "publish": "authorised via CI, version 0.4.1"
+  },
+  "preserve": [
+    "fixtures/simple-single/package.json",
+    "fixtures/simple-single/bun.lock",
+    "fixtures/monorepo-catalog/package.json",
+    "fixtures/monorepo-catalog/packages/app/package.json",
+    "fixtures/monorepo-catalog/bun.lock"
+  ],
+  "verification": {
+    "report": "reports/editor-update-feedback/verification.md",
+    "unitTests": 86,
+    "unitAssertions": 182,
+    "feedbackScenarios": 18,
+    "zeroIOWarmLifecycle": "pass",
+    "negativeControls": 3,
+    "actualVSCodeVerified": true,
+    "fixtureFingerprints": "unchanged",
+    "actualVSCodeEvidence": "User confirmed the Development Host testing looks good before requesting CI deployment"
+  }
+}

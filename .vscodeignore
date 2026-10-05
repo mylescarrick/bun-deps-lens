@@ -1,5 +1,10 @@
 .vscode/**
 .vscode-test/**
+.github/**
+fixtures/**
+reports/**
+plans.*
+PUBLISHING.md
 src/**
 test/**
 node_modules/**
@@ -7,6 +12,5 @@ tsconfig.json
 biome.jsonc
 bun.lock
 .gitignore
-**/*.map
 **/*.ts
 !dist/**

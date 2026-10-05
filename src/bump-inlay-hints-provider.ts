@@ -1,9 +1,22 @@
 import * as vscode from "vscode";
 import { computeBumpTarget } from "./bump-target";
-import { findDependencyLocations } from "./package-json";
+import { dependencyLocations } from "./document-locations";
 import type { DepStatus } from "./types";
 
-export class BumpInlayHintsProvider implements vscode.InlayHintsProvider {
+export class BumpInlayHintsProvider
+  implements vscode.InlayHintsProvider, vscode.Disposable
+{
+  private readonly changed = new vscode.EventEmitter<void>();
+  readonly onDidChangeInlayHints = this.changed.event;
+
+  refresh(): void {
+    this.changed.fire();
+  }
+
+  dispose(): void {
+    this.changed.dispose();
+  }
+
   private readonly getStatuses: (
     uri: string
   ) => Map<string, DepStatus> | undefined;
@@ -18,13 +31,18 @@ export class BumpInlayHintsProvider implements vscode.InlayHintsProvider {
     document: vscode.TextDocument,
     range: vscode.Range
   ): vscode.InlayHint[] {
+    if (
+      !vscode.workspace.getConfiguration("bunDeps").get<boolean>("enable", true)
+    ) {
+      return [];
+    }
     const statuses = this.getStatuses(document.uri.toString());
     if (statuses === undefined) {
       return [];
     }
 
     const hints: vscode.InlayHint[] = [];
-    for (const location of findDependencyLocations(document.getText())) {
+    for (const location of dependencyLocations.get(document)) {
       if (
         location.valueEndLine < range.start.line ||
         location.valueStartLine > range.end.line
@@ -41,11 +59,8 @@ export class BumpInlayHintsProvider implements vscode.InlayHintsProvider {
       part.command = {
         arguments: [
           {
-            endCol: target.range.end.character,
-            endLine: target.range.end.line,
+            location,
             newValue: target.newValue,
-            startCol: target.range.start.character,
-            startLine: target.range.start.line,
             uri: document.uri.toString(),
           },
         ],

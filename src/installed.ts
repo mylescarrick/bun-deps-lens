@@ -1,12 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { satisfies, validRange } from "semver";
-import {
-  findLockfile,
-  type LockfileIndex,
-  loadLockfileIndex,
-} from "./bun/lockfile";
+import type { LockfileIndex } from "./bun/lockfile";
 import { catalogReferenceFromDeclaredRange } from "./catalog-link";
+import type { InstalledSnapshot } from "./installed-snapshot";
 import type { DepLocation, HoistConflict } from "./types";
 
 const CATALOG_SECTIONS = new Set<string>([
@@ -39,7 +34,7 @@ export function isPending(
   name: string,
   declaredRange: string,
   installed?: string,
-  lockfileRoot?: string
+  index?: LockfileIndex
 ): boolean {
   const range = declaredRange.trim();
   if (range.includes(":") || range === "" || validRange(range) === null) {
@@ -49,59 +44,12 @@ export function isPending(
     // If the exact specifier is already resolved by bun (present in the
     // lockfile) but not on disk, the install has already been applied — the
     // package is most likely platform- or optionality-skipped. Don't nag.
-    if (lockfileRoot !== undefined && isResolved(lockfileRoot, name, range)) {
+    if (index?.hasResolvedSpecifier(name, range)) {
       return false;
     }
     return true;
   }
   return !satisfies(installed, range, { includePrerelease: true });
-}
-
-function isResolved(lockfileRoot: string, name: string, spec: string): boolean {
-  const lockfile = findLockfile(lockfileRoot);
-  if (lockfile === null || lockfile.endsWith(".lockb")) {
-    // Binary lockfiles can't be cheaply inspected here; fall back to the
-    // installed check and let bun outdated/audit surface real misses.
-    return false;
-  }
-  try {
-    const text = readFileSync(lockfile, "utf8");
-    // Package entries carry the descriptor "<name>@<version>"; finding the
-    // package@spec literal tells us bun has resolved this dependency.
-    return text.includes(`${name}@${spec}`);
-  } catch {
-    return false;
-  }
-}
-
-// Walks up from `cwd` looking for node_modules/<name>/package.json so it works
-// in both single-package repos and hoisted workspaces.
-export function readInstalledVersion(
-  cwd: string,
-  name: string
-): string | undefined {
-  let dir = cwd;
-  for (;;) {
-    const manifest = join(
-      dir,
-      "node_modules",
-      ...name.split("/"),
-      "package.json"
-    );
-    if (existsSync(manifest)) {
-      try {
-        const { version } = JSON.parse(readFileSync(manifest, "utf8"));
-        return typeof version === "string" ? version : undefined;
-      } catch {
-        return;
-      }
-    }
-    const parent = dirname(dir);
-    if (parent === dir) {
-      return;
-    }
-    dir = parent;
-  }
 }
 
 type CatalogState =
@@ -193,15 +141,16 @@ function resolvedCatalogVersions(
 }
 
 function resolvedDependencyVersions(
-  cwd: string,
-  location: DepLocation,
-  index?: LockfileIndex
+  snapshot: InstalledSnapshot,
+  location: DepLocation
 ): string[] {
-  const installed = readInstalledVersion(cwd, location.name);
+  const installed = snapshot.installed.get(location.name);
   if (installed !== undefined) {
     return [installed];
   }
-  const topLevel = index?.topLevelResolvedVersion(location.name);
+  const topLevel = snapshot.lockfile?.index.topLevelResolvedVersion(
+    location.name
+  );
   if (topLevel !== undefined) {
     return [topLevel];
   }
@@ -209,10 +158,10 @@ function resolvedDependencyVersions(
 }
 
 export function computeResolvedVersions(
-  cwd: string,
+  snapshot: InstalledSnapshot,
   locations: DepLocation[]
 ): ResolvedVersions {
-  const loaded = loadLockfileIndex(cwd);
+  const loaded = snapshot.lockfile;
   const versionsByName: ResolvedVersions = new Map();
   for (const location of locations) {
     if (isCatalogSection(location)) {
@@ -228,24 +177,28 @@ export function computeResolvedVersions(
     mergeVersion(
       versionsByName,
       location.name,
-      resolvedDependencyVersions(cwd, location, loaded?.index)
+      resolvedDependencyVersions(snapshot, location)
     );
   }
   return versionsByName;
 }
 
 export function computeAnnotations(
-  cwd: string,
+  snapshot: InstalledSnapshot,
   locations: DepLocation[]
 ): Annotations {
-  const loaded = loadLockfileIndex(cwd);
+  const loaded = snapshot.lockfile;
   const pending = new Map<string, Pending>();
   const conflicts = new Map<string, HoistConflict>();
   const unusedCatalogs = new Set<string>();
   const catalogConsumerCounts = new Map<string, number>();
 
-  for (const location of locations) {
-    const installed = readInstalledVersion(cwd, location.name);
+  // Newly typed names remain unknown until their asynchronous reads complete.
+  const knownLocations = locations.filter((location) =>
+    snapshot.installed.has(location.name)
+  );
+  for (const location of knownLocations) {
+    const installed = snapshot.installed.get(location.name);
 
     if (
       loaded !== undefined &&
@@ -285,7 +238,7 @@ export function computeAnnotations(
     }
 
     if (
-      isPending(location.name, location.declaredRange, installed, loaded?.root)
+      isPending(location.name, location.declaredRange, installed, loaded?.index)
     ) {
       pending.set(location.name, {
         declared: location.declaredRange,

@@ -40,8 +40,13 @@ latest published version, keeping whatever qualifier you wrote (`^`, `~`, `=`,
 or none) — `^0.18.12` becomes `^0.18.13`. Compound or partial ranges
 (`^1 || ^2`, `>=1.2.3`, `^1.2`) and non-semver specifiers (`catalog:`,
 `workspace:`, git/file URLs, `*`, `latest`) are left alone rather than guessed
-at. Nothing runs `bun i` for you — the existing pending-install hint (below)
-picks up the change once you install.
+at. Updates auto-save a clean manifest, or a dirty buffer containing only known
+Bun Deps edits. Pre-existing unsaved edits, or other edits made during the update,
+are left unsaved with explicit save-first guidance. Related updates are applied
+in order, and stale actions cannot overwrite a different dependency.
+
+Nothing runs `bun i` for you. Save any remaining edits, then install to clear the
+pending-install hint.
 
 ## Monorepo catalogs
 
@@ -67,8 +72,9 @@ picks up the change once you install.
 - **Live updates** — annotations refresh as you edit `package.json`, not just on
   save.
 - **Pending-install hint** — if you change a version range to something that
-  isn't installed yet, the value turns amber with `● run bun i to apply`. It
-  clears automatically once you run `bun i`.
+  isn't installed yet, the value turns amber with `● run bun i to apply`.
+  Unsaved changes say `● save package.json, then run bun i to apply` instead.
+  Saving clears the save-first wording locally; installing clears the pending hint.
 
 ## Install
 
@@ -103,7 +109,7 @@ Run **Bun Deps: Refresh** from the command palette to re-analyse on demand.
 bun install
 bun run build        # bundle with `bun build` (CommonJS, vscode external)
 bun test             # unit tests for parsers, snapshots & status logic
-bun run test:extension # Node lifecycle test with editor/process adapters
+bun run test:extension # Node lifecycle and editor-feedback checks with adapters
 bun run typecheck    # tsc --noEmit
 bun run lint         # ultracite (Biome) check
 ```

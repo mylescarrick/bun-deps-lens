@@ -1,7 +1,7 @@
 {
   "name": "bun-deps",
   "displayName": "Bun Deps",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Inline colour-coded dependency status for package.json, with one-click updates and catalog navigation — powered by Bun's outdated & audit CLIs.",
   "categories": [
     "Linters",
@@ -37,7 +37,7 @@
     "publish": "vsce publish --no-dependencies",
     "setup:fixtures": "for d in fixtures/monorepo-catalog fixtures/simple-single; do (cd \"$d\" && bun install); done",
     "test": "bun test",
-    "test:extension": "bash test/extension-lifecycle.sh",
+    "test:extension": "bash test/extension-lifecycle.sh && bash test/extension-feedback.sh",
     "typecheck": "tsc --noEmit",
     "vscode:prepublish": "bun run build",
     "watch": "bun build ./src/extension.ts --outdir dist --target node --format cjs --external vscode --sourcemap=linked --watch"

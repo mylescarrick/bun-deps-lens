@@ -96,6 +96,12 @@ function computeStatus(
 }
 
 export const PENDING_INLINE = "● run bun i to apply";
+export function pendingInline(isDirty: boolean): string {
+  return isDirty
+    ? "● save package.json, then run bun i to apply"
+    : PENDING_INLINE;
+}
+
 export const UNUSED_CATALOG_INLINE = "○ unused catalog entry";
 
 export function unusedCatalogTooltip(name: string, declared: string): string {
@@ -140,13 +146,16 @@ export function conflictTooltip(conflict: HoistConflict): string {
 export function pendingTooltip(
   name: string,
   declared: string,
-  installed?: string
+  installed?: string,
+  isDirty = false
 ): string {
   const lines = [
     "$(package) **Bun Deps**",
     "",
     `**${name}**`,
-    "Run `bun i` to apply your change.",
+    isDirty
+      ? "Save `package.json`, then run `bun i` to apply your change."
+      : "Run `bun i` to apply your change.",
     installed === undefined
       ? `Declared \`${declared}\` is not installed yet.`
       : `Declared \`${declared}\`, installed \`${installed}\`.`,

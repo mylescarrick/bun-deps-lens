@@ -80,25 +80,36 @@ Azure DevOps once. To bootstrap it you need a real credential temporarily:
 4. **Delete the temporary client secret** — CI uses the federated credential, so
    nothing stored. — TODO
 
-### 5. GitHub configuration — TODO
+### 5. GitHub configuration — DONE
 
-- Repo → **Settings → Environments** → create **`release`** (optionally add
-  required reviewers to gate publishes).
-- Repo → **Settings → Secrets and variables → Actions** → add:
-  - `AZURE_CLIENT_ID` = `a5e55024-131e-41e8-9a98-f5d1f3ffa48f`
-  - `AZURE_TENANT_ID` = `f5296a02-bc33-46a1-91e1-c52eda52c829`
+The **`release`** environment exists and has environment-scoped
+`AZURE_CLIENT_ID` and `AZURE_TENANT_ID` secrets. The previous `v0.4.0` CI
+release successfully authenticated and published through this environment.
+
+For a new setup, create **Settings → Environments → release**, optionally add
+required reviewers, and add these environment secrets:
+
+- `AZURE_CLIENT_ID` = `a5e55024-131e-41e8-9a98-f5d1f3ffa48f`
+- `AZURE_TENANT_ID` = `f5296a02-bc33-46a1-91e1-c52eda52c829`
 
 ## Cutting a release
 
+1. Bump `package.json` and update `CHANGELOG.md`, commit, then open a PR.
+2. Wait for PR verification and merge. Fetch the merged `main`, then confirm
+   its package version matches the proposed tag and that the tag is unused.
+3. Tag that merged commit and push only the intended release tag:
+
 ```sh
-# 1. Bump the version (edit package.json + CHANGELOG.md), commit.
-# 2. Tag and push — this triggers verify → publish.
-git tag v0.1.0
-git push origin main --tags
+# Example for 0.4.1. Do not reuse an existing release version or tag.
+git fetch origin main
+git show origin/main:package.json
+git tag -a v0.4.1 origin/main -m "Release 0.4.1"
+git push origin refs/tags/v0.4.1
 ```
 
-The `verify` job (lint, typecheck, tests, `vsce package`) runs on every push
-and PR; `publish` runs only on `v*` tags after `verify` passes.
+The `verify` job (lint, typecheck, unit tests, editor lifecycle/feedback tests
+and `vsce package`) runs on pushes to `main`, PRs targeting `main`, and `v*`
+tags. `publish` runs only on `v*` tags after `verify` passes.
 
 ## Publishing manually (fallback)
 

@@ -27,6 +27,7 @@ const INSTALLED_REFRESH_MS = 30_000;
 const installedSnapshots = new InstalledSnapshotCache();
 
 let decorator: DepDecorator;
+let bumpHints: BumpInlayHintsProvider;
 let output: vscode.OutputChannel;
 const analysisCache = new Map<string, Map<string, DepStatus>>();
 const analysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -37,9 +38,10 @@ let bunUnavailableWarned = false;
 
 export function activate(context: vscode.ExtensionContext): void {
   decorator = new DepDecorator();
+  bumpHints = new BumpInlayHintsProvider(getCachedStatuses);
   output = vscode.window.createOutputChannel("Bun Deps");
   const lockWatcher = vscode.workspace.createFileSystemWatcher("**/bun.lock*");
-  context.subscriptions.push(decorator, output, lockWatcher);
+  context.subscriptions.push(decorator, bumpHints, output, lockWatcher);
 
   const packageJsonSelector: vscode.DocumentFilter = {
     language: "json",
@@ -55,10 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
       new BumpCodeActionProvider(getCachedStatuses),
       { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] }
     ),
-    vscode.languages.registerInlayHintsProvider(
-      packageJsonSelector,
-      new BumpInlayHintsProvider(getCachedStatuses)
-    ),
+    vscode.languages.registerInlayHintsProvider(packageJsonSelector, bumpHints),
     vscode.commands.registerCommand("bunDeps.bumpToLatest", (args) =>
       bumpToLatest(args).catch(reportError)
     ),
@@ -82,6 +81,7 @@ export function activate(context: vscode.ExtensionContext): void {
       forEachEditor(event.document, scheduleRender);
     }),
     vscode.workspace.onDidSaveTextDocument((doc) => {
+      forEachEditor(doc, scheduleRender);
       forEachEditor(doc, scheduleAnalysis);
     }),
     vscode.workspace.onDidCloseTextDocument((doc) => {
@@ -90,6 +90,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }
       const key = doc.uri.toString();
       analysisCache.delete(key);
+      bumpHints.refresh();
       dependencyLocations.delete(key);
       if (doc.uri.scheme === "file") {
         installedSnapshots.delete(dirname(doc.uri.fsPath));
@@ -107,6 +108,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeWorkspaceFolders(invalidateInstalled),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("bunDeps")) {
+        bumpHints.refresh();
         refreshAllVisible();
       }
     })
@@ -362,6 +364,7 @@ async function runAnalysis(editor: vscode.TextEditor): Promise<void> {
       return;
     }
     analysisCache.set(doc.uri.toString(), statuses);
+    bumpHints.refresh();
     const outdated = [...statuses.values()].filter((s) => s.outdated).length;
     const vulnerable = [...statuses.values()].filter(
       (s) => s.color === "red"

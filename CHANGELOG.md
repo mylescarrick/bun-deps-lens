@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.1]
+
+- Keep known-name edits disk-free by sharing parsed dependency locations and
+  asynchronously cached installed snapshots. Load only newly added names, and
+  revalidate visible manifests every 30 seconds without registry requests.
+- Fix duplicated Bun Deps hover sections and refresh update inlay hints when
+  asynchronous analysis completes.
+- Auto-save dependency updates from clean or provably Bun Deps-owned buffers,
+  including related updates. Preserve unrelated unsaved edits with explicit
+  save-first guidance; handle failed saves and stale update actions safely.
+- Preserve decorations across settings changes, split editors and Git comparison
+  views. Avoid reparsing lockfiles for catalog navigation.
+- Refresh development tooling, trim packaged development files and retain
+  VS Code 1.90 compatibility.
+
 ## [0.4.0]
 
 - Go to catalog definition: Cmd+click/Ctrl+click (or F12) the word `catalog`

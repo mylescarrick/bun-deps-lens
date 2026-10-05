@@ -42,9 +42,17 @@ export class BumpCodeActionProvider implements vscode.CodeActionProvider {
         `Update ${location.name} to ${target.newValue}`,
         vscode.CodeActionKind.QuickFix
       );
-      const edit = new vscode.WorkspaceEdit();
-      edit.replace(document.uri, target.range, target.newValue);
-      action.edit = edit;
+      action.command = {
+        arguments: [
+          {
+            location,
+            newValue: target.newValue,
+            uri: document.uri.toString(),
+          },
+        ],
+        command: "bunDeps.bumpToLatest",
+        title: action.title,
+      };
       actions.push(action);
     }
     return actions;

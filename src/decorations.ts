@@ -6,7 +6,7 @@ import {
   conflictInline,
   conflictTooltip,
   inlineLabel,
-  PENDING_INLINE,
+  pendingInline,
   pendingTooltip,
   UNUSED_CATALOG_INLINE,
   unusedCatalogTooltip,
@@ -30,6 +30,7 @@ const THEME_COLOR: Record<DecorationColor, string> = {
 };
 
 export class DepDecorator implements vscode.Disposable {
+  private readonly hoverType = vscode.window.createTextEditorDecorationType({});
   private readonly types: Record<
     DecorationColor,
     vscode.TextEditorDecorationType
@@ -55,6 +56,7 @@ export class DepDecorator implements vscode.Disposable {
     catalogConsumerCounts: Map<string, number>
   ): void {
     const buckets = emptyBuckets();
+    const hovers: vscode.DecorationOptions[] = [];
 
     for (const location of locations) {
       const rendered = renderLocation(
@@ -69,6 +71,7 @@ export class DepDecorator implements vscode.Disposable {
       );
       if (rendered !== undefined) {
         buckets[rendered.color].push(...rendered.options);
+        hovers.push(rendered.hover);
       }
     }
 
@@ -76,6 +79,7 @@ export class DepDecorator implements vscode.Disposable {
     editor.setDecorations(this.types.amber, buckets.amber);
     editor.setDecorations(this.types.red, buckets.red);
     editor.setDecorations(this.types.unused, buckets.unused);
+    editor.setDecorations(this.hoverType, hovers);
   }
 
   clear(editor: vscode.TextEditor): void {
@@ -83,6 +87,7 @@ export class DepDecorator implements vscode.Disposable {
     editor.setDecorations(this.types.amber, []);
     editor.setDecorations(this.types.red, []);
     editor.setDecorations(this.types.unused, []);
+    editor.setDecorations(this.hoverType, []);
   }
 
   dispose(): void {
@@ -90,11 +95,13 @@ export class DepDecorator implements vscode.Disposable {
     this.types.amber.dispose();
     this.types.red.dispose();
     this.types.unused.dispose();
+    this.hoverType.dispose();
   }
 }
 
 interface RenderedDecoration {
   color: DecorationColor;
+  hover: vscode.DecorationOptions;
   options: vscode.DecorationOptions[];
 }
 
@@ -126,7 +133,8 @@ function renderLocation(
       range,
       anchor,
       pendingEntry,
-      showInlineVersions
+      showInlineVersions,
+      document.isDirty
     );
   }
   if (isCatalogLocation(location) && unusedCatalogs.has(location.name)) {
@@ -173,22 +181,21 @@ function pendingDecoration(
   range: vscode.Range,
   anchor: vscode.Position,
   pendingEntry: Pending,
-  showInlineVersions: boolean
+  showInlineVersions: boolean,
+  isDirty: boolean
 ): RenderedDecoration {
-  return {
-    color: "amber",
-    options: decoration(
-      range,
-      anchor,
-      pendingTooltip(
-        location.name,
-        pendingEntry.declared,
-        pendingEntry.installed
-      ),
-      showInlineVersions ? PENDING_INLINE : undefined,
-      "amber"
+  return decoration(
+    range,
+    anchor,
+    pendingTooltip(
+      location.name,
+      pendingEntry.declared,
+      pendingEntry.installed,
+      isDirty
     ),
-  };
+    showInlineVersions ? pendingInline(isDirty) : undefined,
+    "amber"
+  );
 }
 
 function unusedCatalogDecoration(
@@ -197,16 +204,13 @@ function unusedCatalogDecoration(
   anchor: vscode.Position,
   showInlineVersions: boolean
 ): RenderedDecoration {
-  return {
-    color: "unused",
-    options: decoration(
-      range,
-      anchor,
-      unusedCatalogTooltip(location.name, location.declaredRange),
-      showInlineVersions ? UNUSED_CATALOG_INLINE : undefined,
-      "unused"
-    ),
-  };
+  return decoration(
+    range,
+    anchor,
+    unusedCatalogTooltip(location.name, location.declaredRange),
+    showInlineVersions ? UNUSED_CATALOG_INLINE : undefined,
+    "unused"
+  );
 }
 
 function statusDecoration(
@@ -230,16 +234,13 @@ function statusDecoration(
     catalogConsumerCount,
     documentUri
   );
-  return {
-    color,
-    options: decoration(
-      range,
-      anchor,
-      tooltip,
-      showInlineVersions ? inline : undefined,
-      color
-    ),
-  };
+  return decoration(
+    range,
+    anchor,
+    tooltip,
+    showInlineVersions ? inline : undefined,
+    color
+  );
 }
 
 function statusCopy(
@@ -287,11 +288,8 @@ function bumpUpdateLink(
   }
   const args = [
     {
-      endCol: target.range.end.character,
-      endLine: target.range.end.line,
+      location,
       newValue: target.newValue,
-      startCol: target.range.start.character,
-      startLine: target.range.start.line,
       uri: documentUri.toString(),
     },
   ];
@@ -322,17 +320,15 @@ function catalogRevealLink(
   return `[Cmd+click/Ctrl+click "catalog" to upgrade (affects ${workspaces})](${commandUri("bunDeps.revealCatalogDefinition", args)})`;
 }
 
-// Splits the value's text colour from its inline annotation: the value keeps
-// its own range (so only the quoted string is coloured), while the
-// annotation is a separate zero-width decoration at `anchor` (past the
-// trailing comma, when there is one) carrying the same hover tooltip.
+// Colour only the value and anchor the annotation after the comma. A separate
+// unstyled range owns their shared tooltip so VS Code cannot show it twice.
 function decoration(
   range: vscode.Range,
   anchor: vscode.Position,
   tooltip: string,
   inline: string | undefined,
   color: DecorationColor
-): vscode.DecorationOptions[] {
+): RenderedDecoration {
   const hover = new vscode.MarkdownString(tooltip);
   hover.supportThemeIcons = true;
   hover.isTrusted = {
@@ -342,13 +338,19 @@ function decoration(
     ],
   };
 
-  const valueOption: vscode.DecorationOptions = { hoverMessage: hover, range };
+  const hoverOption: vscode.DecorationOptions = {
+    hoverMessage: hover,
+    range: new vscode.Range(
+      range.start,
+      inline === undefined ? range.end : anchor
+    ),
+  };
+  const valueOption: vscode.DecorationOptions = { range };
   if (inline === undefined) {
-    return [valueOption];
+    return { color, hover: hoverOption, options: [valueOption] };
   }
 
   const annotationOption: vscode.DecorationOptions = {
-    hoverMessage: hover,
     range: new vscode.Range(anchor, anchor),
     renderOptions: {
       after: {
@@ -358,7 +360,11 @@ function decoration(
       },
     },
   };
-  return [valueOption, annotationOption];
+  return {
+    color,
+    hover: hoverOption,
+    options: [valueOption, annotationOption],
+  };
 }
 
 function makeType(color: DecorationColor): vscode.TextEditorDecorationType {
